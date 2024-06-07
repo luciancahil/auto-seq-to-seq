@@ -10,9 +10,9 @@ import numpy as np
 from torch.utils.data import TensorDataset, DataLoader, RandomSampler
 
 from Lang import EOS_token
-from utils import filterPairs, readLangs, DEVICE, MAX_LENGTH, showPlot, timeSince
+from utils import filterPairs, readLangs, read_single_lang, DEVICE, MAX_LENGTH, showPlot, timeSince
 
-from model import EncoderRNN, AttnDecoderRNN
+from model import EncoderRNN, AttnDecoderRNN, Variator
 
 device = DEVICE
 
@@ -66,7 +66,21 @@ def prepareData(lang1, lang2, reverse=False):
     return input_lang, output_lang, pairs
 
 
-def train_epoch(dataloader, encoder, decoder, encoder_optimizer,
+def prepare_single_data(lang1, reverse=False):
+    input_lang, output_lang, pairs = read_single_lang(lang1, reverse)
+    print("Read %s sentence pairs" % len(pairs))
+    pairs = filterPairs(pairs)
+    print("Trimmed to %s sentence pairs" % len(pairs))
+    print("Counting words...")
+    for pair in pairs:
+        input_lang.addSentence(pair[0])
+        output_lang.addSentence(pair[1])
+    print("Counted words:")
+    print(input_lang.name, input_lang.n_words)
+    print(output_lang.name, output_lang.n_words)
+    return input_lang, output_lang, pairs
+
+def train_epoch(dataloader, encoder, variator, hidden_vaiator, decoder, encoder_optimizer,
           decoder_optimizer, criterion):
 
     total_loss = 0
@@ -77,7 +91,9 @@ def train_epoch(dataloader, encoder, decoder, encoder_optimizer,
         decoder_optimizer.zero_grad()
 
         encoder_outputs, encoder_hidden = encoder(input_tensor)
-        decoder_outputs, _, _ = decoder(encoder_outputs, encoder_hidden, target_tensor)
+        variator_outputs, mu, log_var = variator(encoder_outputs, isTraining = True)
+        hidden_vaiator_outputs, hid_mu, hid_logvar = hidden_vaiator(encoder_hidden)
+        decoder_outputs, _, _ = decoder(variator_outputs, hidden_vaiator_outputs, target_tensor)
 
         loss = criterion(
             decoder_outputs.view(-1, decoder_outputs.size(-1)),
@@ -93,7 +109,7 @@ def train_epoch(dataloader, encoder, decoder, encoder_optimizer,
     return total_loss / len(dataloader)
 
 
-def train(train_dataloader, encoder, decoder, n_epochs, learning_rate=0.001,
+def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epochs, learning_rate=0.001,
                print_every=100, plot_every=100):
     start = time.time()
     plot_losses = []
@@ -105,7 +121,7 @@ def train(train_dataloader, encoder, decoder, n_epochs, learning_rate=0.001,
     criterion = nn.NLLLoss()
 
     for epoch in range(1, n_epochs + 1):
-        loss = train_epoch(train_dataloader, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion)
+        loss = train_epoch(train_dataloader, encoder, variator, hidden_variator, decoder, encoder_optimizer, decoder_optimizer, criterion)
         print_loss_total += loss
         plot_loss_total += loss
 
@@ -122,12 +138,14 @@ def train(train_dataloader, encoder, decoder, n_epochs, learning_rate=0.001,
 
     showPlot(plot_losses)
 
-def evaluate(encoder, decoder, sentence, input_lang, output_lang):
+def evaluate(encoder, variator, hidden_variator, decoder, sentence, input_lang, output_lang):
     with torch.no_grad():
         input_tensor = tensorFromSentence(input_lang, sentence)
 
         encoder_outputs, encoder_hidden = encoder(input_tensor)
-        decoder_outputs, decoder_hidden, decoder_attn = decoder(encoder_outputs, encoder_hidden)
+        variator_outputs,_,_ = variator(encoder_outputs)
+        hidden_vaiator_outputs,_,_ = hidden_variator(encoder_hidden)
+        decoder_outputs, decoder_hidden, decoder_attn = decoder(variator_outputs, hidden_vaiator_outputs)
 
         _, topi = decoder_outputs.topk(1)
         decoded_ids = topi.squeeze()
@@ -141,32 +159,36 @@ def evaluate(encoder, decoder, sentence, input_lang, output_lang):
     return decoded_words, decoder_attn
 
 
-def evaluateRandomly(encoder, decoder, n=10):
+def evaluateRandomly(encoder, variator, hidden_variator, decoder, n=10):
     for i in range(n):
         pair = random.choice(pairs)
         print('>', pair[0])
         print('=', pair[1])
-        output_words, _ = evaluate(encoder, decoder, pair[0], input_lang, output_lang)
+        output_words, _ = evaluate(encoder, variator, hidden_variator, decoder, pair[0], input_lang, output_lang)
         output_sentence = ' '.join(output_words)
         print('<', output_sentence)
         print('')
 
 
-input_lang, output_lang, pairs = prepareData('eng', 'fra', True)
+
+##MAIN
+input_lang, output_lang, pairs = prepare_single_data('eng', True)
 print(random.choice(pairs))
 
 
 hidden_size = 128
 batch_size = 32
-
+num_epochs = 160
 input_lang, output_lang, train_dataloader = get_dataloader(batch_size)
 
 encoder = EncoderRNN(input_lang.n_words, hidden_size).to(device)
+variator = Variator(hidden_size)
+hidden_variator = Variator(hidden_size)
 decoder = AttnDecoderRNN(hidden_size, output_lang.n_words).to(device)
 
-train(train_dataloader, encoder, decoder, 80, print_every=5, plot_every=5)
+train(train_dataloader, encoder, variator, hidden_variator, decoder, num_epochs, print_every=5, plot_every=5)
 
 
 encoder.eval()
 decoder.eval()
-evaluateRandomly(encoder, decoder)
+evaluateRandomly(encoder, variator, hidden_variator, decoder)

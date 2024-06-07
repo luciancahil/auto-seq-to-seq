@@ -122,3 +122,40 @@ class AttnDecoderRNN(nn.Module):
         output = self.out(output)
 
         return output, hidden, attn_weights
+    
+
+class Variator(nn.Module):
+    def __init__(self, input_size, hidden_size = 100):
+        super(Variator, self).__init__()
+        self.encode_mu = nn.Linear(input_size, hidden_size)
+        self.encode_log_var = nn.Linear(input_size, hidden_size)
+        self.decode_layer = nn.Linear(hidden_size, input_size)
+    
+
+    def encode(self, x):
+        log_var = self.encode_log_var(x)
+        x = self.encode_mu(x)
+        return x, log_var
+
+    def decode(self, x):
+        x = self.decode_layer(x)
+        return x
+
+    def reparameterize(self, x, log_var):
+        # Get standard deviation
+        std = torch.exp(log_var)
+        # Returns random numbers from a normal distribution
+        eps = torch.randn_like(std)
+        # Return sampled values
+        return eps.mul(std).add_(x)
+
+    def forward(self, x, isTraining = False):
+        mu, log_var = self.encode(x)
+
+        if(isTraining):
+            x = self.reparameterize(mu, log_var)
+            x = self.decode(x)
+        else:
+            x = self.decode(mu)
+        
+        return x, mu, log_var
