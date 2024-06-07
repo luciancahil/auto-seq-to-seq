@@ -30,7 +30,7 @@ def tensorsFromPair(pair):
     return (input_tensor, target_tensor)
 
 def get_dataloader(batch_size):
-    input_lang, output_lang, pairs = prepareData('eng', 'fra', True)
+    input_lang, output_lang, pairs = prepare_single_data('eng', True)
 
     n = len(pairs)
     input_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
@@ -186,6 +186,7 @@ variator = Variator(hidden_size)
 hidden_variator = Variator(hidden_size)
 decoder = AttnDecoderRNN(hidden_size, output_lang.n_words).to(device)
 
+print("begin train")
 train(train_dataloader, encoder, variator, hidden_variator, decoder, num_epochs, print_every=5, plot_every=5)
 
 
