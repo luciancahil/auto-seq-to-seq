@@ -107,7 +107,7 @@ def readLang(lang):
 
     return input_lang, output_lang, pairs
 
-MAX_LENGTH = 10
+MAX_LENGTH = 40
 
 eng_prefixes = (
     "i am ", "i m ",
@@ -124,10 +124,13 @@ def filterPair(p):
         p[1].startswith(eng_prefixes)
 
 def filterWord(w):
-    return len(w) < MAX_LENGTH
+    return len(w) < MAX_LENGTH and w.startswith(eng_prefixes)
 
 def filterPairs(pairs):
     return [pair for pair in pairs if filterPair(pair)]
+
+def filterWords(words):
+    return [word for word in words if filterWord(word[0])]
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -10,14 +10,14 @@ import numpy as np
 from torch.utils.data import TensorDataset, DataLoader, RandomSampler
 
 from Lang import EOS_token
-from utils import filterPairs, readLangs, read_single_lang, DEVICE, MAX_LENGTH, showPlot, timeSince
+from utils import filterPairs, readLangs, read_single_lang, DEVICE, MAX_LENGTH, showPlot, timeSince, filterWords
 
 from model import EncoderRNN, AttnDecoderRNN, Variator
 
 device = DEVICE
 
 def indexesFromSentence(lang, sentence):
-    return [lang.word2index[word] for word in sentence.split(' ')]
+    return [lang.char2index[char] for char in sentence]
 
 def tensorFromSentence(lang, sentence):
     indexes = indexesFromSentence(lang, sentence)
@@ -56,28 +56,28 @@ def prepareData(lang1, lang2, reverse=False):
     print("Read %s sentence pairs" % len(pairs))
     pairs = filterPairs(pairs)
     print("Trimmed to %s sentence pairs" % len(pairs))
-    print("Counting words...")
+    print("Counting chars...")
     for pair in pairs:
         input_lang.addSentence(pair[0])
         output_lang.addSentence(pair[1])
-    print("Counted words:")
-    print(input_lang.name, input_lang.n_words)
-    print(output_lang.name, output_lang.n_words)
+    print("Counted chars:")
+    print(input_lang.name, input_lang.n_chars)
+    print(output_lang.name, output_lang.n_chars)
     return input_lang, output_lang, pairs
 
 
 def prepare_single_data(lang1, reverse=False):
     input_lang, output_lang, pairs = read_single_lang(lang1, reverse)
     print("Read %s sentence pairs" % len(pairs))
-    pairs = filterPairs(pairs)
+    pairs = filterWords(pairs)
     print("Trimmed to %s sentence pairs" % len(pairs))
-    print("Counting words...")
+    print("Counting chars...")
     for pair in pairs:
         input_lang.addSentence(pair[0])
         output_lang.addSentence(pair[1])
-    print("Counted words:")
-    print(input_lang.name, input_lang.n_words)
-    print(output_lang.name, output_lang.n_words)
+    print("Counted chars:")
+    print(input_lang.name, input_lang.n_chars)
+    print(output_lang.name, output_lang.n_chars)
     return input_lang, output_lang, pairs
 
 def train_epoch(dataloader, encoder, variator, hidden_vaiator, decoder, encoder_optimizer,
@@ -94,7 +94,6 @@ def train_epoch(dataloader, encoder, variator, hidden_vaiator, decoder, encoder_
         variator_outputs, mu, log_var = variator(encoder_outputs, isTraining = True)
         hidden_vaiator_outputs, hid_mu, hid_logvar = hidden_vaiator(encoder_hidden)
         decoder_outputs, _, _ = decoder(variator_outputs, hidden_vaiator_outputs, target_tensor)
-
         loss = criterion(
             decoder_outputs.view(-1, decoder_outputs.size(-1)),
             target_tensor.view(-1)
@@ -150,13 +149,13 @@ def evaluate(encoder, variator, hidden_variator, decoder, sentence, input_lang, 
         _, topi = decoder_outputs.topk(1)
         decoded_ids = topi.squeeze()
 
-        decoded_words = []
+        decoded_chars = []
         for idx in decoded_ids:
             if idx.item() == EOS_token:
-                decoded_words.append('<EOS>')
+                decoded_chars.append('<EOS>')
                 break
-            decoded_words.append(output_lang.index2word[idx.item()])
-    return decoded_words, decoder_attn
+            decoded_chars.append(output_lang.index2char[idx.item()])
+    return decoded_chars, decoder_attn
 
 
 def evaluateRandomly(encoder, variator, hidden_variator, decoder, n=10):
@@ -164,8 +163,8 @@ def evaluateRandomly(encoder, variator, hidden_variator, decoder, n=10):
         pair = random.choice(pairs)
         print('>', pair[0])
         print('=', pair[1])
-        output_words, _ = evaluate(encoder, variator, hidden_variator, decoder, pair[0], input_lang, output_lang)
-        output_sentence = ' '.join(output_words)
+        output_chars, _ = evaluate(encoder, variator, hidden_variator, decoder, pair[0], input_lang, output_lang)
+        output_sentence = ' '.join(output_chars)
         print('<', output_sentence)
         print('')
 
@@ -178,13 +177,13 @@ print(random.choice(pairs))
 
 hidden_size = 128
 batch_size = 32
-num_epochs = 160
+num_epochs = 50
 input_lang, output_lang, train_dataloader = get_dataloader(batch_size)
 
-encoder = EncoderRNN(input_lang.n_words, hidden_size).to(device)
+encoder = EncoderRNN(input_lang.n_chars, hidden_size).to(device)
 variator = Variator(hidden_size)
 hidden_variator = Variator(hidden_size)
-decoder = AttnDecoderRNN(hidden_size, output_lang.n_words).to(device)
+decoder = AttnDecoderRNN(hidden_size, output_lang.n_chars).to(device)
 
 print("begin train")
 train(train_dataloader, encoder, variator, hidden_variator, decoder, num_epochs, print_every=5, plot_every=5)
