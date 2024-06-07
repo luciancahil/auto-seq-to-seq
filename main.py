@@ -80,8 +80,35 @@ def prepare_single_data(lang1, reverse=False):
     print(output_lang.name, output_lang.n_chars)
     return input_lang, output_lang, pairs
 
+def kl_loss(mu=None, logstd=None):
+    """
+    Closed formula of the KL divergence for normal distributions
+    """
+    MAX_LOGSTD = 10
+    logstd = logstd.clamp(max=MAX_LOGSTD)
+    mu = mu.to(device)
+    logstd = logstd.to(device)
+    kl_div = -0.5 * torch.mean(torch.sum(1 + 2 * logstd - mu**2 - torch.exp(2 * logstd), dim=1))
+
+    # Limit numeric errors
+    kl_div = kl_div.clamp(max=1000)
+    return kl_div    
+
+def loss_fn(outputs, target, criterion, mus, log_vars, kl_beta = 0.05):
+    recon_loss = criterion(
+        outputs.view(-1, outputs.size(-1)),
+        target.view(-1)
+    )
+    
+    kl_losses = 0
+
+    for i in range(len(mus)):
+        kl_losses += kl_loss(mus[i], log_vars[i])
+
+    return recon_loss + kl_beta/len(mus) * kl_losses, recon_loss, kl_losses
+
 def train_epoch(dataloader, encoder, variator, hidden_vaiator, decoder, encoder_optimizer,
-          decoder_optimizer, criterion):
+          decoder_optimizer, criterion, percent_done):
 
     total_loss = 0
     for data in dataloader:
@@ -94,10 +121,14 @@ def train_epoch(dataloader, encoder, variator, hidden_vaiator, decoder, encoder_
         variator_outputs, mu, log_var = variator(encoder_outputs, isTraining = True)
         hidden_vaiator_outputs, hid_mu, hid_logvar = hidden_vaiator(encoder_hidden)
         decoder_outputs, _, _ = decoder(variator_outputs, hidden_vaiator_outputs, target_tensor)
-        loss = criterion(
-            decoder_outputs.view(-1, decoder_outputs.size(-1)),
-            target_tensor.view(-1)
-        )
+
+        means = [mu, hid_mu]
+        log_vars = [log_var, hid_logvar]
+
+        kl_beta = percent_done * 0.1
+
+        loss, recon_loss, kl_loss = loss_fn(decoder_outputs, target_tensor, criterion, means, log_vars)
+
         loss.backward()
 
         encoder_optimizer.step()
@@ -113,6 +144,8 @@ def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epoch
     start = time.time()
     plot_losses = []
     print_loss_total = 0  # Reset every print_every
+    print_total_recon_loss = 0
+    print_total_kl_loss = 0
     plot_loss_total = 0  # Reset every plot_every
 
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
@@ -120,7 +153,7 @@ def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epoch
     criterion = nn.NLLLoss()
 
     for epoch in range(1, n_epochs + 1):
-        loss = train_epoch(train_dataloader, encoder, variator, hidden_variator, decoder, encoder_optimizer, decoder_optimizer, criterion)
+        loss, print_total_recon_loss, print_total_kl_loss = train_epoch(train_dataloader, encoder, variator, hidden_variator, decoder, encoder_optimizer, decoder_optimizer, criterion, (epoch - 1)/num_epochs)
         print_loss_total += loss
         plot_loss_total += loss
 
@@ -164,7 +197,7 @@ def evaluateRandomly(encoder, variator, hidden_variator, decoder, n=10):
         print('>', pair[0])
         print('=', pair[1])
         output_chars, _ = evaluate(encoder, variator, hidden_variator, decoder, pair[0], input_lang, output_lang)
-        output_sentence = ' '.join(output_chars)
+        output_sentence = ''.join(output_chars)
         print('<', output_sentence)
         print('')
 
