@@ -69,6 +69,43 @@ def readLangs(lang1, lang2, reverse=False):
     return input_lang, output_lang, pairs
 
 
+def read_single_lang(lang, reverse=False):
+    print("Reading lines...")
+
+    # Read the file and split into lines
+    lines = open('data/%s.txt' % (lang), encoding='utf-8').\
+        read().strip().split('\n')
+
+    # Split every line into pairs and normalize
+    pairs = [[normalizeString(l), normalizeString(l)] for l in lines]
+
+    # Reverse pairs, make Lang instances
+    if reverse:
+        pairs = [list(reversed(p)) for p in pairs]
+        input_lang = Lang(lang)
+        output_lang = Lang(lang)
+    else:
+        input_lang = Lang(lang)
+        output_lang = Lang(lang)
+
+    return input_lang, output_lang, pairs
+
+def readLang(lang):
+    print("Reading lines...")
+
+    # Read the file and split into lines
+    lines = open('data/%s-%s.txt' % (lang), encoding='utf-8').\
+        read().strip().split('\n')
+
+    # Split every line into pairs and normalize
+    pairs = [[normalizeString(s) for s in l.split('\t')] for l in lines]
+
+    # Reverse pairs, make Lang instances
+    input_lang = Lang(lang)
+    output_lang = Lang(lang)
+
+
+    return input_lang, output_lang, pairs
 
 MAX_LENGTH = 10
 
@@ -86,9 +123,15 @@ def filterPair(p):
         len(p[1].split(' ')) < MAX_LENGTH and \
         p[1].startswith(eng_prefixes)
 
+def filterWord(w):
+    return len(w) < MAX_LENGTH
 
 def filterPairs(pairs):
     return [pair for pair in pairs if filterPair(pair)]
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+token_to_enum = {'g': 2, 'o': 3, '.': 4, 'r': 5, 'u': 6, 'n': 7, '!': 8, 'w': 9, 'f': 10, 'i': 11, 'e': 12, 'h': 13, 'l': 14, 'p': 15, 'j': 16, 'm': 17, 's': 18, 't': 19, 'a': 20, ' ': 21, 'y': 22, 'c': 23, 'k': 24, '?': 25, "'": 26, 'b': 27, 'd': 28, 'q': 29, ',': 30, 'v': 31, 'z': 32, 'x': 33, '0': 34, '-': 35, '"': 36}
+enum_to_token = ['[START]', '[END]', 'g', 'o', '.', 'r', 'u', 'n', '!', 'w', 'f', 'i', 'e', 'h', 'l', 'p', 'j', 'm', 's', 't', 'a', ' ', 'y', 'c', 'k', '?', "'", 'b', 'd', 'q', ',', 'v', 'z', 'x', '0', '-', '"']
