@@ -96,6 +96,7 @@ class AttnDecoderRNN(nn.Module):
                 sub_seq_num += 1
                 decoder_hidden = encoder_hidden[:, :, sub_seq_num * HIDDEN_SIZE: (sub_seq_num + 1) * HIDDEN_SIZE]
 
+            decoder_hidden = decoder_hidden.contiguous()
             decoder_output, decoder_hidden, attn_weights = self.forward_step(
                 decoder_input, decoder_hidden, encoder_outputs
             )
