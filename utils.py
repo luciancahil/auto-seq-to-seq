@@ -10,7 +10,8 @@ import time
 import math
 
 # 
-SUB_SEQ_LEN = 10
+SUB_SEQ_LEN = 15
+HIDDEN_SIZE = 128
 
 def asMinutes(s):
     m = math.floor(s / 60)

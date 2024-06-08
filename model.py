@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch import optim
 import torch.nn.functional as F
-from utils import MAX_LENGTH, DEVICE
+from utils import MAX_LENGTH, DEVICE, SUB_SEQ_LEN, HIDDEN_SIZE
 from Lang import SOS_token, EOS_token
 
 device = DEVICE
@@ -88,8 +88,14 @@ class AttnDecoderRNN(nn.Module):
         decoder_hidden = encoder_hidden
         decoder_outputs = []
         attentions = []
+        sub_seq_num = -1 # add to 0 to start
 
         for i in range(MAX_LENGTH):
+            if i % SUB_SEQ_LEN == 0:
+                # we need a new subsequence hidden vector.
+                sub_seq_num += 1
+                decoder_hidden = encoder_hidden[:, :, sub_seq_num * HIDDEN_SIZE: (sub_seq_num + 1) * HIDDEN_SIZE]
+
             decoder_output, decoder_hidden, attn_weights = self.forward_step(
                 decoder_input, decoder_hidden, encoder_outputs
             )

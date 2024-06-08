@@ -1,5 +1,6 @@
 import random
 import time
+import math
 
 import torch
 import torch.nn as nn
@@ -10,7 +11,7 @@ import numpy as np
 from torch.utils.data import TensorDataset, DataLoader, RandomSampler
 
 from Lang import EOS_token
-from utils import filterPairs, readLangs, read_single_lang, DEVICE, MAX_LENGTH, showPlot, timeSince, filterWords
+from utils import filterPairs, readLangs, read_single_lang, DEVICE, MAX_LENGTH, SUB_SEQ_LEN, HIDDEN_SIZE, showPlot, timeSince, filterWords
 
 from model import EncoderRNN, AttnDecoderRNN, Variator
 
@@ -203,18 +204,19 @@ def evaluateRandomly(encoder, variator, hidden_variator, decoder, n=10):
 
 
 ##MAIN
+num_sub_seqs = math.ceil(MAX_LENGTH / SUB_SEQ_LEN)
 input_lang, output_lang, pairs = prepare_single_data('chem', True)
 print(random.choice(pairs))
 
 
-hidden_size = 128
+hidden_size = HIDDEN_SIZE
 batch_size = 32
-num_epochs = 50
+num_epochs = 200
 input_lang, output_lang, train_dataloader = get_dataloader(batch_size)
 
 encoder = EncoderRNN(input_lang.n_chars, hidden_size).to(device)
 variator = Variator(hidden_size)
-hidden_variator = Variator(hidden_size)
+hidden_variator = Variator(hidden_size, output_size=num_sub_seqs * hidden_size)
 decoder = AttnDecoderRNN(hidden_size, output_lang.n_chars).to(device)
 
 print("begin train")
