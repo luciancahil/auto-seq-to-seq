@@ -125,11 +125,13 @@ class AttnDecoderRNN(nn.Module):
     
 
 class Variator(nn.Module):
-    def __init__(self, input_size, hidden_size = 100):
+    def __init__(self, input_size, hidden_size = 100, output_size = None):
         super(Variator, self).__init__()
+        if(output_size == None):
+            output_size = input_size
         self.encode_mu = nn.Linear(input_size, hidden_size)
         self.encode_log_var = nn.Linear(input_size, hidden_size)
-        self.decode_layer = nn.Linear(hidden_size, input_size)
+        self.decode_layer = nn.Linear(hidden_size, output_size)
     
 
     def encode(self, x):
