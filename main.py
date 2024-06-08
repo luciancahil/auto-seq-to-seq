@@ -30,8 +30,7 @@ def tensorsFromPair(pair):
     return (input_tensor, target_tensor)
 
 def get_dataloader(batch_size):
-    input_lang, output_lang, pairs = prepare_single_data('eng', True)
-
+    input_lang, output_lang, pairs = prepare_single_data('chem', True)
     n = len(pairs)
     input_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
     target_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
@@ -107,11 +106,11 @@ def loss_fn(outputs, target, criterion, mus, log_vars, kl_beta = 0.05):
 
     return recon_loss + kl_beta/len(mus) * kl_losses, recon_loss, kl_losses
 
-def train_epoch(dataloader, encoder, variator, hidden_vaiator, decoder, encoder_optimizer,
+def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder_optimizer,
           decoder_optimizer, criterion, percent_done):
 
     total_loss = 0
-    for data in dataloader:
+    for data in (dataloader):
         input_tensor, target_tensor = data
 
         encoder_optimizer.zero_grad()
@@ -119,8 +118,8 @@ def train_epoch(dataloader, encoder, variator, hidden_vaiator, decoder, encoder_
 
         encoder_outputs, encoder_hidden = encoder(input_tensor)
         variator_outputs, mu, log_var = variator(encoder_outputs, isTraining = True)
-        hidden_vaiator_outputs, hid_mu, hid_logvar = hidden_vaiator(encoder_hidden)
-        decoder_outputs, _, _ = decoder(variator_outputs, hidden_vaiator_outputs, target_tensor)
+        hidden_variator_outputs, hid_mu, hid_logvar = hidden_variator(encoder_hidden)
+        decoder_outputs, _, _ = decoder(variator_outputs, hidden_variator_outputs, target_tensor)
 
         means = [mu, hid_mu]
         log_vars = [log_var, hid_logvar]
@@ -136,7 +135,7 @@ def train_epoch(dataloader, encoder, variator, hidden_vaiator, decoder, encoder_
 
         total_loss += loss.item()
 
-    return total_loss / len(dataloader)
+    return total_loss / len(dataloader), recon_loss / len(dataloader), kl_loss / len(dataloader)
 
 
 def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epochs, learning_rate=0.001,
@@ -204,7 +203,7 @@ def evaluateRandomly(encoder, variator, hidden_variator, decoder, n=10):
 
 
 ##MAIN
-input_lang, output_lang, pairs = prepare_single_data('eng', True)
+input_lang, output_lang, pairs = prepare_single_data('chem', True)
 print(random.choice(pairs))
 
 

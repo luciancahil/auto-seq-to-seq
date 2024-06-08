@@ -9,6 +9,8 @@ import numpy as np
 import time
 import math
 
+# 
+SUB_SEQ_LEN = 10
 
 def asMinutes(s):
     m = math.floor(s / 60)
@@ -77,7 +79,8 @@ def read_single_lang(lang, reverse=False):
         read().strip().split('\n')
 
     # Split every line into pairs and normalize
-    pairs = [[normalizeString(l), normalizeString(l)] for l in lines]
+    #pairs = [[normalizeString(l), normalizeString(l)] for l in lines]
+    pairs = [[l, l] for l in lines]
 
     # Reverse pairs, make Lang instances
     if reverse:
@@ -124,7 +127,7 @@ def filterPair(p):
         p[1].startswith(eng_prefixes)
 
 def filterWord(w):
-    return len(w) < MAX_LENGTH and w.startswith(eng_prefixes)
+    return len(w) < MAX_LENGTH# and w.startswith(eng_prefixes)
 
 def filterPairs(pairs):
     return [pair for pair in pairs if filterPair(pair)]
