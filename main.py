@@ -108,14 +108,19 @@ def loss_fn(outputs, target, criterion, mus, log_vars, kl_beta = 0.05):
     return recon_loss + kl_beta/len(mus) * kl_losses, recon_loss, kl_losses
 
 def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder_optimizer,
-          decoder_optimizer, criterion, percent_done):
+          decoder_optimizer, variator_optimizer, hidden_variator_optimizer, criterion, percent_done):
 
     total_loss = 0
     for data in (dataloader):
         input_tensor, target_tensor = data
 
+        input_tensor.to(device)
+        target_tensor.to(device)
+
         encoder_optimizer.zero_grad()
         decoder_optimizer.zero_grad()
+        variator_optimizer.zero_grad()
+        hidden_variator_optimizer.zero_grad()
 
         encoder_outputs, encoder_hidden = encoder(input_tensor)
         variator_outputs, mu, log_var = variator(encoder_outputs, isTraining = True)
@@ -133,6 +138,8 @@ def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder
 
         encoder_optimizer.step()
         decoder_optimizer.step()
+        variator_optimizer.step()
+        hidden_variator_optimizer.step()
 
         total_loss += loss.item()
 
@@ -150,10 +157,12 @@ def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epoch
 
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
+    variator_optimizer = optim.Adam(variator.parameters(), lr = learning_rate)
+    hidden_variator_optimizer = optim.Adam(hidden_variator.parameters(), lr = learning_rate)
     criterion = nn.NLLLoss()
 
     for epoch in range(1, n_epochs + 1):
-        loss, print_total_recon_loss, print_total_kl_loss = train_epoch(train_dataloader, encoder, variator, hidden_variator, decoder, encoder_optimizer, decoder_optimizer, criterion, (epoch - 1)/num_epochs)
+        loss, print_total_recon_loss, print_total_kl_loss = train_epoch(train_dataloader, encoder, variator, hidden_variator, decoder, encoder_optimizer, decoder_optimizer, variator_optimizer, hidden_variator_optimizer, criterion, (epoch - 1)/num_epochs)
         print_loss_total += loss
         plot_loss_total += loss
 
@@ -219,6 +228,10 @@ variator = Variator(hidden_size)
 hidden_variator = Variator(hidden_size, output_size=num_sub_seqs * hidden_size)
 decoder = AttnDecoderRNN(hidden_size, output_lang.n_chars).to(device)
 
+encoder.to(device)
+variator.to(device)
+hidden_variator.to(device)
+decoder.to(device)
 print("begin train")
 train(train_dataloader, encoder, variator, hidden_variator, decoder, num_epochs, print_every=5, plot_every=5)
 
