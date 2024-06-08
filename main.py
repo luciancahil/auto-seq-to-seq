@@ -222,7 +222,9 @@ decoder = AttnDecoderRNN(hidden_size, output_lang.n_chars).to(device)
 print("begin train")
 train(train_dataloader, encoder, variator, hidden_variator, decoder, num_epochs, print_every=5, plot_every=5)
 
+full_model = (encoder, variator, hidden_variator, decoder)
 
+torch.save(full_model, 'model.pt')
 encoder.eval()
 decoder.eval()
-evaluateRandomly(encoder, variator, hidden_variator, decoder)
+evaluateRandomly(encoder, variator, hidden_variator, decoder, n = 100)
