@@ -177,7 +177,6 @@ def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epoch
             plot_losses.append(plot_loss_avg)
             plot_loss_total = 0
 
-    showPlot(plot_losses)
 
 def evaluate(encoder, variator, hidden_variator, decoder, sentence, input_lang, output_lang):
     with torch.no_grad():
