@@ -11,7 +11,7 @@ import numpy as np
 from torch.utils.data import TensorDataset, DataLoader, RandomSampler
 
 from Lang import EOS_token
-from utils import filterPairs, readLangs, read_single_lang, DEVICE, MAX_LENGTH, SUB_SEQ_LEN, HIDDEN_SIZE, showPlot, timeSince, filterWords
+from utils import filterPairs, readLangs, read_single_lang, DEVICE, MAX_LENGTH, SUB_SEQ_LEN, HIDDEN_SIZE, timeSince, filterWords
 
 from model import EncoderRNN, AttnDecoderRNN, Variator
 
