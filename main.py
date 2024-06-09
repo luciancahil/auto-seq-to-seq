@@ -170,7 +170,7 @@ def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epoch
             print_loss_avg = print_loss_total / print_every
             print_loss_total = 0
             print('%s (%d %d%%) %.4f' % (timeSince(start, epoch / n_epochs),
-                                        epoch, epoch / n_epochs * 100, print_loss_avg))
+                                        epoch, epoch / n_epochs * 100, print_loss_avg), flush=True)
 
         if epoch % plot_every == 0:
             plot_loss_avg = plot_loss_total / plot_every
@@ -212,7 +212,7 @@ def evaluateRandomly(encoder, variator, hidden_variator, decoder, n=10):
 
 
 ##MAIN
-print("Device: " + str(device))
+print("Device: " + str(device), flush=True)
 num_sub_seqs = math.ceil(MAX_LENGTH / SUB_SEQ_LEN)
 input_lang, output_lang, pairs = prepare_single_data('chem', True)
 print(random.choice(pairs))
@@ -232,7 +232,7 @@ encoder.to(device)
 variator.to(device)
 hidden_variator.to(device)
 decoder.to(device)
-print("begin train")
+print("begin train", flush=True)
 train(train_dataloader, encoder, variator, hidden_variator, decoder, num_epochs, print_every=5, plot_every=5)
 
 full_model = (encoder, variator, hidden_variator, decoder)
