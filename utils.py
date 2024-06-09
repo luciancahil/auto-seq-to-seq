@@ -2,8 +2,6 @@ import unicodedata
 import re
 from Lang import Lang
 import torch
-import matplotlib.pyplot as plt
-plt.switch_backend('agg')
 import matplotlib.ticker as ticker
 import numpy as np
 import time
@@ -26,13 +24,13 @@ def timeSince(since, percent):
     return '%s (- %s)' % (asMinutes(s), asMinutes(rs))
 
 
-def showPlot(points):
+"""def showPlot(points):
     plt.figure()
     fig, ax = plt.subplots()
     # this locator puts ticks at regular intervals
     loc = ticker.MultipleLocator(base=0.2)
     ax.yaxis.set_major_locator(loc)
-    plt.plot(points)
+    plt.plot(points)"""
 
 # Turn a Unicode string to plain ASCII, thanks to
 # https://stackoverflow.com/a/518232/2809427
