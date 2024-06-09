@@ -32,7 +32,7 @@ def tensorsFromPair(pair):
 
 def get_dataloader(batch_size):
     input_lang, output_lang, pairs = prepare_single_data('chem', True)
-    pairs = pairs[0:100000]
+    pairs = pairs[0:200000]
     n = len(pairs)
     input_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
     target_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
@@ -221,7 +221,7 @@ print(random.choice(pairs))
 
 hidden_size = HIDDEN_SIZE
 batch_size = 32
-num_epochs = 50
+num_epochs = 150
 input_lang, output_lang, train_dataloader = get_dataloader(batch_size)
 
 encoder = EncoderRNN(input_lang.n_chars, hidden_size).to(device)
