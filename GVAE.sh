@@ -13,14 +13,21 @@
 #SBATCH --error=output_GVAE.txt
 
 cd $SLURM_SUBMIT_DIR
+echo "Hello!"
 module load conda
+echo "Hello1!"
 conda init bash
+echo "Hello2!"
 module load gcc
+echo "Hello3!"
 module load openmpi
+echo "Hello4!"
 module load git
+echo "Hello5!"
 source ~/.bashrc
+echo "Hello6!"
 conda activate gvae
-cd gvae
+echo "Hello6!"
 python main.py
 conda deactivate
 
