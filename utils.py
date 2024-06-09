@@ -2,7 +2,6 @@ import unicodedata
 import re
 from Lang import Lang
 import torch
-import matplotlib.ticker as ticker
 import numpy as np
 import time
 import math
