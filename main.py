@@ -212,6 +212,7 @@ def evaluateRandomly(encoder, variator, hidden_variator, decoder, n=10):
 
 
 ##MAIN
+print("Device: " + str(device))
 num_sub_seqs = math.ceil(MAX_LENGTH / SUB_SEQ_LEN)
 input_lang, output_lang, pairs = prepare_single_data('chem', True)
 print(random.choice(pairs))
