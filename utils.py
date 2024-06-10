@@ -5,6 +5,9 @@ import torch
 import numpy as np
 import time
 import math
+from Lang import EOS_token
+import random
+from torch.utils.data import TensorDataset, DataLoader, RandomSampler
 
 # 
 SUB_SEQ_LEN = 15
@@ -136,6 +139,72 @@ def filterWords(words):
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+def indexesFromSentence(lang, sentence):
+    return [lang.char2index[char] for char in sentence]
 
+def tensorFromSentence(lang, sentence):
+    indexes = indexesFromSentence(lang, sentence)
+    indexes.append(EOS_token)
+    return torch.tensor(indexes, dtype=torch.long, device=DEVICE).view(1, -1)
+
+def tensorsFromPair(pair):
+    input_tensor = tensorFromSentence(input_lang, pair[0])
+    target_tensor = tensorFromSentence(output_lang, pair[1])
+    return (input_tensor, target_tensor)
+
+def get_dataloader(batch_size):
+    input_lang, output_lang, pairs = prepare_single_data('chem', True)
+    pairs = pairs[0:100]
+    n = len(pairs)
+    input_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
+    target_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
+
+    for idx, (inp, tgt) in enumerate(pairs):
+        inp_ids = indexesFromSentence(input_lang, inp)
+        tgt_ids = indexesFromSentence(output_lang, tgt)
+        inp_ids.append(EOS_token)
+        tgt_ids.append(EOS_token)
+        input_ids[idx, :len(inp_ids)] = inp_ids
+        target_ids[idx, :len(tgt_ids)] = tgt_ids
+
+    train_data = TensorDataset(torch.LongTensor(input_ids).to(DEVICE),
+                               torch.LongTensor(target_ids).to(DEVICE))
+
+    train_sampler = RandomSampler(train_data)
+    train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=batch_size)
+    return input_lang, output_lang, train_dataloader
+
+def prepareData(lang1, lang2, reverse=False):
+    input_lang, output_lang, pairs = readLangs(lang1, lang2, reverse)
+    print("Read %s sentence pairs" % len(pairs))
+    pairs = filterPairs(pairs)
+    print("Trimmed to %s sentence pairs" % len(pairs))
+    print("Counting chars...")
+    for pair in pairs:
+        input_lang.addSentence(pair[0])
+        output_lang.addSentence(pair[1])
+    print("Counted chars:")
+    print(input_lang.name, input_lang.n_chars)
+    print(output_lang.name, output_lang.n_chars)
+    return input_lang, output_lang, pairs
+
+
+def prepare_single_data(lang1, reverse=False):
+    input_lang, output_lang, pairs = read_single_lang(lang1, reverse)
+    print("Read %s sentence pairs" % len(pairs))
+    pairs = filterWords(pairs)
+    print("Trimmed to %s sentence pairs" % len(pairs))
+    print("Counting chars...")
+    for pair in pairs:
+        input_lang.addSentence(pair[0])
+        output_lang.addSentence(pair[1])
+    print("Counted chars:")
+    print(input_lang.name, input_lang.n_chars)
+    print(output_lang.name, output_lang.n_chars)
+    return input_lang, output_lang, pairs
 token_to_enum = {'g': 2, 'o': 3, '.': 4, 'r': 5, 'u': 6, 'n': 7, '!': 8, 'w': 9, 'f': 10, 'i': 11, 'e': 12, 'h': 13, 'l': 14, 'p': 15, 'j': 16, 'm': 17, 's': 18, 't': 19, 'a': 20, ' ': 21, 'y': 22, 'c': 23, 'k': 24, '?': 25, "'": 26, 'b': 27, 'd': 28, 'q': 29, ',': 30, 'v': 31, 'z': 32, 'x': 33, '0': 34, '-': 35, '"': 36}
 enum_to_token = ['[START]', '[END]', 'g', 'o', '.', 'r', 'u', 'n', '!', 'w', 'f', 'i', 'e', 'h', 'l', 'p', 'j', 'm', 's', 't', 'a', ' ', 'y', 'c', 'k', '?', "'", 'b', 'd', 'q', ',', 'v', 'z', 'x', '0', '-', '"']
+
+
+input_lang, output_lang, pairs = prepare_single_data('chem', True)
+print(random.choice(pairs))
