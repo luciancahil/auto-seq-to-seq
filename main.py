@@ -11,7 +11,7 @@ import numpy as np
 from torch.utils.data import TensorDataset, DataLoader, RandomSampler
 
 from Lang import EOS_token
-from utils import filterPairs, readLangs, read_single_lang, DEVICE, MAX_LENGTH, SUB_SEQ_LEN, HIDDEN_SIZE, timeSince, filterWords, prepare_single_data, tensorFromSentence, get_dataloader, pairs
+from utils import DEVICE, MAX_LENGTH, SUB_SEQ_LEN, HIDDEN_SIZE, timeSince, prepare_single_data, tensorFromSentence, get_dataloader
 
 from model import EncoderRNN, AttnDecoderRNN, Variator
 
@@ -63,7 +63,7 @@ def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder
 
         encoder_outputs, encoder_hidden = encoder(input_tensor)
         variator_outputs, mu, log_var = variator(encoder_outputs, isTraining = True)
-        hidden_variator_outputs, hid_mu, hid_logvar = hidden_variator(encoder_hidden)
+        hidden_variator_outputs, hid_mu, hid_logvar = hidden_variator(encoder_hidden, isTraining = True)
         decoder_outputs, _, _ = decoder(variator_outputs, hidden_variator_outputs, target_tensor)
 
         means = [mu, hid_mu]
@@ -151,6 +151,9 @@ def evaluateRandomly(encoder, variator, hidden_variator, decoder, n=10):
 
 
 ##MAIN
+input_lang, output_lang, pairs = prepare_single_data('chem', True)
+print(random.choice(pairs))
+file_name = 'chem'
 print("Device: " + str(device), flush=True)
 
 
@@ -159,7 +162,7 @@ num_sub_seqs = math.ceil(MAX_LENGTH / SUB_SEQ_LEN)
 hidden_size = HIDDEN_SIZE
 batch_size = 32
 num_epochs = 150
-input_lang, output_lang, train_dataloader = get_dataloader(batch_size)
+input_lang, output_lang, train_dataloader = get_dataloader(file_name, batch_size)
 
 encoder = EncoderRNN(input_lang.n_chars, hidden_size).to(device)
 variator = Variator(hidden_size)

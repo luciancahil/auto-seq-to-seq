@@ -13,6 +13,7 @@ from torch.utils.data import TensorDataset, DataLoader, RandomSampler
 SUB_SEQ_LEN = 15
 HIDDEN_SIZE = 128
 
+
 def asMinutes(s):
     m = math.floor(s / 60)
     s -= m * 60
@@ -147,13 +148,23 @@ def tensorFromSentence(lang, sentence):
     indexes.append(EOS_token)
     return torch.tensor(indexes, dtype=torch.long, device=DEVICE).view(1, -1)
 
-def tensorsFromPair(pair):
+def tensorsFromPair(pair, input_lang, output_lang):
     input_tensor = tensorFromSentence(input_lang, pair[0])
     target_tensor = tensorFromSentence(output_lang, pair[1])
     return (input_tensor, target_tensor)
 
-def get_dataloader(batch_size):
-    input_lang, output_lang, pairs = prepare_single_data('chem', True)
+def get_dataloader(file_name, batch_size):
+    input_tensor, output_tensor, input_lang, output_lang = get_data_tensors(file_name)
+
+    train_data = TensorDataset(input_tensor, output_tensor)
+
+    train_sampler = RandomSampler(train_data)
+    train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=batch_size)
+    return input_lang, output_lang, train_dataloader
+
+
+def get_data_tensors(file_name):
+    input_lang, output_lang, pairs = prepare_single_data(file_name, True)
     pairs = pairs[0:100]
     n = len(pairs)
     input_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
@@ -166,13 +177,8 @@ def get_dataloader(batch_size):
         tgt_ids.append(EOS_token)
         input_ids[idx, :len(inp_ids)] = inp_ids
         target_ids[idx, :len(tgt_ids)] = tgt_ids
-
-    train_data = TensorDataset(torch.LongTensor(input_ids).to(DEVICE),
-                               torch.LongTensor(target_ids).to(DEVICE))
-
-    train_sampler = RandomSampler(train_data)
-    train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=batch_size)
-    return input_lang, output_lang, train_dataloader
+    
+    return torch.LongTensor(input_ids).to(DEVICE), torch.LongTensor(target_ids).to(DEVICE), input_lang, output_lang
 
 def prepareData(lang1, lang2, reverse=False):
     input_lang, output_lang, pairs = readLangs(lang1, lang2, reverse)
@@ -204,7 +210,3 @@ def prepare_single_data(lang1, reverse=False):
     return input_lang, output_lang, pairs
 token_to_enum = {'g': 2, 'o': 3, '.': 4, 'r': 5, 'u': 6, 'n': 7, '!': 8, 'w': 9, 'f': 10, 'i': 11, 'e': 12, 'h': 13, 'l': 14, 'p': 15, 'j': 16, 'm': 17, 's': 18, 't': 19, 'a': 20, ' ': 21, 'y': 22, 'c': 23, 'k': 24, '?': 25, "'": 26, 'b': 27, 'd': 28, 'q': 29, ',': 30, 'v': 31, 'z': 32, 'x': 33, '0': 34, '-': 35, '"': 36}
 enum_to_token = ['[START]', '[END]', 'g', 'o', '.', 'r', 'u', 'n', '!', 'w', 'f', 'i', 'e', 'h', 'l', 'p', 'j', 'm', 's', 't', 'a', ' ', 'y', 'c', 'k', '?', "'", 'b', 'd', 'q', ',', 'v', 'z', 'x', '0', '-', '"']
-
-
-input_lang, output_lang, pairs = prepare_single_data('chem', True)
-print(random.choice(pairs))
