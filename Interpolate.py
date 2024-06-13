@@ -24,6 +24,10 @@ def get_latents(model, x):
     return output_latent, hidden_latent
 
 #MAIN
+try:
+    NUM_SEEDS = int(sys.argv[1])
+except(Exception):
+    NUM_SEEDS = 6
 
 def interpolate(tensor_one, tensor_two, numpoints = 5):
     alphas = [1 / i for i in range(1, numpoints)]
@@ -31,7 +35,7 @@ def interpolate(tensor_one, tensor_two, numpoints = 5):
     return interpolated_latents
 
 input, _, input_lang, output_lang = get_data_tensors('chem')
-input = input[:6]
+input = input[:NUM_SEEDS]
 model = torch.load(model_path, map_location=device)
 print("Starting interpolation")
 # first one is the output, second is the hidden
