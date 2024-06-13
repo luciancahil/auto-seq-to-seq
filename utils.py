@@ -12,6 +12,7 @@ from torch.utils.data import TensorDataset, DataLoader, RandomSampler
 # 
 SUB_SEQ_LEN = 15
 HIDDEN_SIZE = 128
+MAX_LENGTH = 40
 
 
 def asMinutes(s):
@@ -112,7 +113,6 @@ def readLang(lang):
 
     return input_lang, output_lang, pairs
 
-MAX_LENGTH = 40
 
 eng_prefixes = (
     "i am ", "i m ",
@@ -208,5 +208,3 @@ def prepare_single_data(lang1, reverse=False):
     print(input_lang.name, input_lang.n_chars)
     print(output_lang.name, output_lang.n_chars)
     return input_lang, output_lang, pairs
-token_to_enum = {'g': 2, 'o': 3, '.': 4, 'r': 5, 'u': 6, 'n': 7, '!': 8, 'w': 9, 'f': 10, 'i': 11, 'e': 12, 'h': 13, 'l': 14, 'p': 15, 'j': 16, 'm': 17, 's': 18, 't': 19, 'a': 20, ' ': 21, 'y': 22, 'c': 23, 'k': 24, '?': 25, "'": 26, 'b': 27, 'd': 28, 'q': 29, ',': 30, 'v': 31, 'z': 32, 'x': 33, '0': 34, '-': 35, '"': 36}
-enum_to_token = ['[START]', '[END]', 'g', 'o', '.', 'r', 'u', 'n', '!', 'w', 'f', 'i', 'e', 'h', 'l', 'p', 'j', 'm', 's', 't', 'a', ' ', 'y', 'c', 'k', '?', "'", 'b', 'd', 'q', ',', 'v', 'z', 'x', '0', '-', '"']

@@ -6,6 +6,7 @@ import torch.nn.functional as F
 device = DEVICE
 import numpy as np
 from Lang import EOS_token
+from rdkit import Chem
 
 model_path = 'model.pt'
 
@@ -48,6 +49,23 @@ for i in range(len(latents[0]) - 1):
         l_2 = latents[1][0,j,:].unsqueeze(dim = 0)
         interpolated_hidden_latents += interpolate(l_1, l_2)
 
+def repair_smiles(smiles):
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is not None:
+        return smiles, True
+
+    possible_last_chars = [')', '1', ']']
+    
+    for char in possible_last_chars:
+        modified_smiles = smiles + char
+        mol = Chem.MolFromSmiles(modified_smiles)
+
+        if mol is not None:
+            return modified_smiles, True
+    
+    return smiles, False
+
+
 
 input_latents = torch.cat(interpolated_latents, dim = 0)
 hidden_latents = torch.cat(interpolated_hidden_latents, dim = 0).unsqueeze(dim = 0)
@@ -71,8 +89,31 @@ for decoded_ids in topi.squeeze():
     
     decoded_chems.append("".join(decoded_chars))
 
-for chem in decoded_chems:
-    print(chem)
+valid_smiles = []
+all_smiles  = []
+num_valid = 0
+all = len(decoded_chems)
+file = open("Smiles.txt", mode='w')
+for smiles in decoded_chems:
+    smiles, valid = repair_smiles(smiles)
+    if valid:
+        valid_smiles.append(smiles)
+        num_valid += 1
+    
+    all_smiles.append(smiles)
 
+file.write("Valid Smiles:\n")
+
+for smile in valid_smiles:
+    file.write(smile)
+    file.write('\n')
+
+file.write("\n\nAll Smiles:\n")
+for smile in all_smiles:
+    file.write(smile)
+    file.write('\n')
+
+file.write("There were {} valid smiles, out of {}".format(num_valid, all))
+print('done!')
 #data = [proces_smiles(seed) for seed in seeds if proces_smiles(seed) is not None]
 #model.interpolate(data, NUM_POINTS)
