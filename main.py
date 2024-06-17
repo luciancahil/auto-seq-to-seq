@@ -51,7 +51,7 @@ def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder
 
     total_loss = 0
     for data in (dataloader):
-        input_tensor, target_tensor = data
+        input_tensor, target_tensor, y_s = data
 
         input_tensor.to(device)
         target_tensor.to(device)
@@ -151,9 +151,9 @@ def evaluateRandomly(encoder, variator, hidden_variator, decoder, n=10):
 
 
 ##MAIN
-input_lang, output_lang, pairs = prepare_single_data('chem', True)
-print(random.choice(pairs))
 file_name = 'chem'
+input_lang, output_lang, pairs, y_s = prepare_single_data(file_name, True)
+print(random.choice(pairs))
 print("Device: " + str(device), flush=True)
 
 
@@ -182,3 +182,7 @@ torch.save(full_model, 'model.pt')
 encoder.eval()
 decoder.eval()
 evaluateRandomly(encoder, variator, hidden_variator, decoder, n = 100)
+#TODO: add scheduler.
+#Add classifier to "Y". (Sort things into "bins". )
+# Run things properly. 
+

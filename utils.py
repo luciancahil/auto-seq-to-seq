@@ -8,12 +8,13 @@ import math
 from Lang import EOS_token
 import random
 from torch.utils.data import TensorDataset, DataLoader, RandomSampler
-
+import sys
 # 
 SUB_SEQ_LEN = 15
 HIDDEN_SIZE = 128
 MAX_LENGTH = 40
-
+MAX_NUM_SAMPLES = 100
+NUM_BINS = -1
 
 def asMinutes(s):
     m = math.floor(s / 60)
@@ -73,6 +74,27 @@ def readLangs(lang1, lang2, reverse=False):
 
     return input_lang, output_lang, pairs
 
+def normalizeYs(y_s):
+
+    if(NUM_BINS == -1):
+        # calculate number of bins, such that each bin has 1000 samples. 
+        # at least 2, at most 20.
+        num_bins = min(20, max(2, MAX_NUM_SAMPLES / 1000))
+    else:
+        num_bins = NUM_BINS
+    quantiles = np.quantile(y_s, np.linspace(0, 1, num_bins + 1))
+    # drop first and last elements, which will be the smallest and largest values
+    quantiles = quantiles[1:-1]
+    print(quantiles)
+
+    y_s = np.digitize(y_s, quantiles).tolist()
+    
+
+    return y_s
+
+
+    
+
 
 def read_single_lang(lang, reverse=False):
     print("Reading lines...")
@@ -80,21 +102,33 @@ def read_single_lang(lang, reverse=False):
     # Read the file and split into lines
     lines = open('data/%s.txt' % (lang), encoding='utf-8').\
         read().strip().split('\n')
+    
+    new_lines = []
+    y_s = []
 
-    # Split every line into pairs and normalize
-    #pairs = [[normalizeString(l), normalizeString(l)] for l in lines]
-    pairs = [[l, l] for l in lines]
-
-    # Reverse pairs, make Lang instances
-    if reverse:
-        pairs = [list(reversed(p)) for p in pairs]
-        input_lang = Lang(lang)
-        output_lang = Lang(lang)
+    if ',' in lines[0]:
+        for l in lines:
+            parts = l.split(',')
+            new_lines.append(parts[0])
+            y_s.append(float(parts[1]))
+        lines = new_lines
+        y_s = normalizeYs(y_s)
+        pairs = [[l, l, y_s[i]] for i, l in enumerate(lines)]
     else:
-        input_lang = Lang(lang)
-        output_lang = Lang(lang)
+        pairs = [[l, l, 0] for l in lines]
 
-    return input_lang, output_lang, pairs
+    input_lang = Lang(lang)
+    output_lang = Lang(lang)
+    print("Read %s sentence pairs" % len(pairs))
+    pairs = filterWords(pairs)
+    pairs = pairs[0:MAX_NUM_SAMPLES]
+
+
+    y_s = [pair[2] for pair in pairs]
+    pairs = [pair[0:2] for pair in pairs]
+
+
+    return input_lang, output_lang, pairs, y_s
 
 def readLang(lang):
     print("Reading lines...")
@@ -154,9 +188,8 @@ def tensorsFromPair(pair, input_lang, output_lang):
     return (input_tensor, target_tensor)
 
 def get_dataloader(file_name, batch_size):
-    input_tensor, output_tensor, input_lang, output_lang = get_data_tensors(file_name)
-
-    train_data = TensorDataset(input_tensor, output_tensor)
+    input_tensor, output_tensor, input_lang, output_lang, y_s = get_data_tensors(file_name)
+    train_data = TensorDataset(input_tensor, output_tensor, y_s)
 
     train_sampler = RandomSampler(train_data)
     train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=batch_size)
@@ -164,8 +197,7 @@ def get_dataloader(file_name, batch_size):
 
 
 def get_data_tensors(file_name):
-    input_lang, output_lang, pairs = prepare_single_data(file_name, True)
-    pairs = pairs[0:100]
+    input_lang, output_lang, pairs, y_s = prepare_single_data(file_name, True)
     n = len(pairs)
     input_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
     target_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
@@ -178,7 +210,8 @@ def get_data_tensors(file_name):
         input_ids[idx, :len(inp_ids)] = inp_ids
         target_ids[idx, :len(tgt_ids)] = tgt_ids
     
-    return torch.LongTensor(input_ids).to(DEVICE), torch.LongTensor(target_ids).to(DEVICE), input_lang, output_lang
+    
+    return torch.LongTensor(input_ids).to(DEVICE), torch.LongTensor(target_ids).to(DEVICE), input_lang, output_lang, torch.LongTensor(y_s)
 
 def prepareData(lang1, lang2, reverse=False):
     input_lang, output_lang, pairs = readLangs(lang1, lang2, reverse)
@@ -196,9 +229,8 @@ def prepareData(lang1, lang2, reverse=False):
 
 
 def prepare_single_data(lang1, reverse=False):
-    input_lang, output_lang, pairs = read_single_lang(lang1, reverse)
-    print("Read %s sentence pairs" % len(pairs))
-    pairs = filterWords(pairs)
+    input_lang, output_lang, pairs, y_s = read_single_lang(lang1, reverse)
+
     print("Trimmed to %s sentence pairs" % len(pairs))
     print("Counting chars...")
     for pair in pairs:
@@ -207,4 +239,4 @@ def prepare_single_data(lang1, reverse=False):
     print("Counted chars:")
     print(input_lang.name, input_lang.n_chars)
     print(output_lang.name, output_lang.n_chars)
-    return input_lang, output_lang, pairs
+    return input_lang, output_lang, pairs, y_s
