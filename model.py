@@ -54,6 +54,10 @@ class EncoderRNN(nn.Module):
         self.dropout = nn.Dropout(dropout_p)
 
     def forward(self, input, y_s, train=False):
+        print("in model")
+        print(input.get_device())
+        print(y_s.get_device())
+
         embedded = self.embedding(input)
         y_embedded = self.embedding(y_s)
         if(train):
