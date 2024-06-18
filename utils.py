@@ -13,7 +13,7 @@ import sys
 SUB_SEQ_LEN = 15
 HIDDEN_SIZE = 128
 MAX_LENGTH = 40
-MAX_NUM_SAMPLES = 600
+MAX_NUM_SAMPLES = 10000
 NUM_BINS = -1
 
 def asMinutes(s):
@@ -79,7 +79,7 @@ def normalizeYs(y_s):
     if(NUM_BINS == -1):
         # calculate number of bins, such that each bin has 1000 samples. 
         # at least 2, at most 20.
-        num_bins = min(20, max(2, MAX_NUM_SAMPLES / 1000))
+        num_bins = min(20, max(2, int(MAX_NUM_SAMPLES / 1000)))
     else:
         num_bins = NUM_BINS
     quantiles = np.quantile(y_s, np.linspace(0, 1, num_bins + 1))

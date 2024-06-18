@@ -143,13 +143,14 @@ class AttnDecoderRNN(nn.Module):
     
 
 class Variator(nn.Module):
-    def __init__(self, input_size, hidden_size = 100, output_size = None):
+    def __init__(self, input_size, num_bins, hidden_size = 100, output_size = None):
         super(Variator, self).__init__()
         if(output_size == None):
             output_size = input_size
         self.encode_mu = nn.Linear(input_size, hidden_size)
         self.encode_log_var = nn.Linear(input_size, hidden_size)
-        self.decode_layer = nn.Linear(hidden_size, output_size)
+        self.decode_layer = nn.Linear(hidden_size + 1, output_size)
+        self.embed_condition = nn.Embedding(num_bins, 1)
     
 
     def encode(self, x):
@@ -157,7 +158,10 @@ class Variator(nn.Module):
         x = self.encode_mu(x)
         return x, log_var
 
-    def decode(self, x):
+    def decode(self, x, y_s):
+        y_s = self.embed_condition(y_s)
+        y_s = y_s.unsqueeze(1).expand(-1, x.shape[1], 1)
+        x = torch.cat((x, y_s), dim=2)
         x = self.decode_layer(x)
         return x
 
@@ -169,13 +173,13 @@ class Variator(nn.Module):
         # Return sampled values
         return eps.mul(std).add_(x)
 
-    def forward(self, x, isTraining = False):
+    def forward(self, x, y_s, isTraining = False):
         mu, log_var = self.encode(x)
 
         if(isTraining):
             x = self.reparameterize(mu, log_var)
-            x = self.decode(x)
+            x = self.decode(x, y_s)
         else:
-            x = self.decode(mu)
+            x = self.decode(mu, y_s)
         
         return x, mu, log_var

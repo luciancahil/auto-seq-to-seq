@@ -63,8 +63,11 @@ def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder
         hidden_variator_optimizer.zero_grad()
 
         encoder_outputs, encoder_hidden = encoder(input_tensor, y_s, train=True)
-        variator_outputs, mu, log_var = variator(encoder_outputs, isTraining = True)
-        hidden_variator_outputs, hid_mu, hid_logvar = hidden_variator(encoder_hidden, isTraining = True)
+        variator_outputs, mu, log_var = variator(encoder_outputs, y_s, isTraining = True)
+        # make sure that hidden and encoder both have num_batch x seq_length * hidden_dims as shapes
+        encoder_hidden = encoder_hidden.squeeze().unsqueeze(dim = 1)
+        hidden_variator_outputs, hid_mu, hid_logvar = hidden_variator(encoder_hidden, y_s, isTraining = True)
+        hidden_variator_outputs = hidden_variator_outputs.squeeze().unsqueeze(dim = 0)
         decoder_outputs, _, _ = decoder(variator_outputs, hidden_variator_outputs, is_training = True, target_tensor=target_tensor)
 
         means = [mu, hid_mu]
@@ -121,8 +124,8 @@ def evaluate(encoder, variator, hidden_variator, decoder, sentence, input_lang, 
     with torch.no_grad():
         input_tensor = tensorFromSentence(input_lang, sentence)
         encoder_outputs, encoder_hidden = encoder(input_tensor, y)
-        variator_outputs,_,_ = variator(encoder_outputs)
-        hidden_vaiator_outputs,_,_ = hidden_variator(encoder_hidden)
+        variator_outputs,_,_ = variator(encoder_outputs, y)
+        hidden_vaiator_outputs,_,_ = hidden_variator(encoder_hidden, y)
         decoder_outputs, decoder_hidden, decoder_attn = decoder(variator_outputs, hidden_vaiator_outputs)
 
         _, topi = decoder_outputs.topk(1)
@@ -160,13 +163,13 @@ num_sub_seqs = math.ceil(MAX_LENGTH / SUB_SEQ_LEN)
 
 hidden_size = HIDDEN_SIZE
 batch_size = 32
-num_epochs = 50
+num_epochs = 150
 input_lang, output_lang, train_dataloader, num_bins, pairs, y_s = get_dataloader(file_name, batch_size)
 print(random.choice(pairs))
 
 encoder = EncoderRNN(input_lang.n_chars, hidden_size, num_bins).to(device)
-variator = Variator(hidden_size)
-hidden_variator = Variator(hidden_size, output_size=num_sub_seqs * hidden_size)
+variator = Variator(hidden_size, num_bins)
+hidden_variator = Variator(hidden_size, num_bins, output_size=num_sub_seqs * hidden_size)
 decoder = AttnDecoderRNN(hidden_size, output_lang.n_chars).to(device)
 
 encoder.to(device)
