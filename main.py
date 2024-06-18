@@ -56,6 +56,7 @@ def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder
 
         input_tensor.to(device)
         target_tensor.to(device)
+        y_s.to(device)
 
         encoder_optimizer.zero_grad()
         decoder_optimizer.zero_grad()
@@ -101,12 +102,22 @@ def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epoch
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
     variator_optimizer = optim.Adam(variator.parameters(), lr = learning_rate)
     hidden_variator_optimizer = optim.Adam(hidden_variator.parameters(), lr = learning_rate)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(encoder_optimizer, T_max=num_epochs)
+    scheduler_decode = optim.lr_scheduler.CosineAnnealingLR(decoder_optimizer, T_max=num_epochs)
+    scheduler_variator = optim.lr_scheduler.CosineAnnealingLR(variator_optimizer, T_max=num_epochs)
+    scheduler_hidden = optim.lr_scheduler.CosineAnnealingLR(hidden_variator_optimizer, T_max=num_epochs)
+
+    schedulers = [scheduler, scheduler_decode, scheduler_hidden, scheduler_variator]
+
     criterion = nn.NLLLoss()
 
     for epoch in range(1, n_epochs + 1):
         loss, print_total_recon_loss, print_total_kl_loss = train_epoch(train_dataloader, encoder, variator, hidden_variator, decoder, encoder_optimizer, decoder_optimizer, variator_optimizer, hidden_variator_optimizer, criterion, (epoch - 1)/num_epochs)
         print_loss_total += loss
         plot_loss_total += loss
+
+        for s in schedulers:
+            s.step()
 
         if epoch % print_every == 0:
             print_loss_avg = print_loss_total / print_every
