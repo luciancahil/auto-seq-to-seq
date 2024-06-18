@@ -56,11 +56,7 @@ def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder
 
         input_tensor.to(device)
         target_tensor.to(device)
-        y_s.to(device)
-
-        print(input_tensor.get_device())
-        print(target_tensor.get_device())
-        print(y_s.get_device())
+        y_s = y_s.to(device)
 
         encoder_optimizer.zero_grad()
         decoder_optimizer.zero_grad()
