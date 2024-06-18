@@ -44,17 +44,25 @@ class DecoderRNN(nn.Module):
         return output, hidden
 
 class EncoderRNN(nn.Module):
-    def __init__(self, input_size, hidden_size, dropout_p=0.1):
+    def __init__(self, input_size, hidden_size, num_bins, dropout_p=0.1):
         super(EncoderRNN, self).__init__()
         self.hidden_size = hidden_size
 
         self.embedding = nn.Embedding(input_size, hidden_size)
+        self.y_embedding = nn.Embedding(num_bins, hidden_size)
         self.gru = nn.GRU(hidden_size, hidden_size, batch_first=True)
         self.dropout = nn.Dropout(dropout_p)
 
-    def forward(self, input):
-        embedded = self.dropout(self.embedding(input))
-        output, hidden = self.gru(embedded)
+    def forward(self, input, y_s, train=False):
+        embedded = self.embedding(input)
+        y_embedded = self.embedding(y_s)
+        if(train):
+            embedded = self.dropout(embedded)
+            y_embedded = self.dropout(y_embedded)
+        
+        y_embedded = torch.unsqueeze(y_embedded, dim = 0)
+        
+        output, hidden = self.gru(embedded, y_embedded)
         return output, hidden
     
 class BahdanauAttention(nn.Module):
@@ -82,7 +90,7 @@ class AttnDecoderRNN(nn.Module):
         self.out = nn.Linear(hidden_size, output_size)
         self.dropout = nn.Dropout(dropout_p)
 
-    def forward(self, encoder_outputs, encoder_hidden, target_tensor=None):
+    def forward(self, encoder_outputs, encoder_hidden, is_training=False, target_tensor=None):
         batch_size = encoder_outputs.size(0)
         decoder_input = torch.empty(batch_size, 1, dtype=torch.long, device=device).fill_(SOS_token)
         decoder_hidden = encoder_hidden
@@ -98,7 +106,7 @@ class AttnDecoderRNN(nn.Module):
 
             decoder_hidden = decoder_hidden.contiguous()
             decoder_output, decoder_hidden, attn_weights = self.forward_step(
-                decoder_input, decoder_hidden, encoder_outputs
+                decoder_input, decoder_hidden, encoder_outputs, isTraining = is_training
             )
             decoder_outputs.append(decoder_output)
             attentions.append(attn_weights)
@@ -118,8 +126,11 @@ class AttnDecoderRNN(nn.Module):
         return decoder_outputs, decoder_hidden, attentions
 
 
-    def forward_step(self, input, hidden, encoder_outputs):
-        embedded =  self.dropout(self.embedding(input))
+    def forward_step(self, input, hidden, encoder_outputs, isTraining = False):
+        embedded =  self.embedding(input)
+
+        if(isTraining):
+            embedded = self.dropout(embedded)
 
         query = hidden.permute(1, 0, 2)
         context, attn_weights = self.attention(query, encoder_outputs)

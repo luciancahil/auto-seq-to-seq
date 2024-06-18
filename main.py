@@ -43,6 +43,7 @@ def loss_fn(outputs, target, criterion, mus, log_vars, kl_beta = 0.05):
 
     for i in range(len(mus)):
         kl_losses += kl_loss(mus[i], log_vars[i])
+    
 
     return recon_loss + kl_beta/len(mus) * kl_losses, recon_loss, kl_losses
 
@@ -61,10 +62,10 @@ def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder
         variator_optimizer.zero_grad()
         hidden_variator_optimizer.zero_grad()
 
-        encoder_outputs, encoder_hidden = encoder(input_tensor)
+        encoder_outputs, encoder_hidden = encoder(input_tensor, y_s, train=True)
         variator_outputs, mu, log_var = variator(encoder_outputs, isTraining = True)
         hidden_variator_outputs, hid_mu, hid_logvar = hidden_variator(encoder_hidden, isTraining = True)
-        decoder_outputs, _, _ = decoder(variator_outputs, hidden_variator_outputs, target_tensor)
+        decoder_outputs, _, _ = decoder(variator_outputs, hidden_variator_outputs, is_training = True, target_tensor=target_tensor)
 
         means = [mu, hid_mu]
         log_vars = [log_var, hid_logvar]
@@ -72,7 +73,6 @@ def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder
         kl_beta = percent_done * 0.1
 
         loss, recon_loss, kl_loss = loss_fn(decoder_outputs, target_tensor, criterion, means, log_vars)
-
         loss.backward()
 
         encoder_optimizer.step()
@@ -85,7 +85,7 @@ def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder
     return total_loss / len(dataloader), recon_loss / len(dataloader), kl_loss / len(dataloader)
 
 
-def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epochs, learning_rate=0.001,
+def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epochs, y_s, learning_rate=0.001,
                print_every=100, plot_every=100):
     start = time.time()
     plot_losses = []
@@ -117,11 +117,10 @@ def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epoch
             plot_loss_total = 0
 
 
-def evaluate(encoder, variator, hidden_variator, decoder, sentence, input_lang, output_lang):
+def evaluate(encoder, variator, hidden_variator, decoder, sentence, input_lang, output_lang, y):
     with torch.no_grad():
         input_tensor = tensorFromSentence(input_lang, sentence)
-
-        encoder_outputs, encoder_hidden = encoder(input_tensor)
+        encoder_outputs, encoder_hidden = encoder(input_tensor, y)
         variator_outputs,_,_ = variator(encoder_outputs)
         hidden_vaiator_outputs,_,_ = hidden_variator(encoder_hidden)
         decoder_outputs, decoder_hidden, decoder_attn = decoder(variator_outputs, hidden_vaiator_outputs)
@@ -138,12 +137,14 @@ def evaluate(encoder, variator, hidden_variator, decoder, sentence, input_lang, 
     return decoded_chars, decoder_attn
 
 
-def evaluateRandomly(encoder, variator, hidden_variator, decoder, n=10):
+def evaluateRandomly(encoder, variator, hidden_variator, decoder, y_s, n=10):
     for i in range(n):
-        pair = random.choice(pairs)
+        index = random.randint(0, len(pairs))
+        pair = pairs[index]
+        y = y_s[index].unsqueeze(dim = 0)
         print('>', pair[0])
         print('=', pair[1])
-        output_chars, _ = evaluate(encoder, variator, hidden_variator, decoder, pair[0], input_lang, output_lang)
+        output_chars, _ = evaluate(encoder, variator, hidden_variator, decoder, pair[0], input_lang, output_lang, y)
         output_sentence = ''.join(output_chars)
         print('<', output_sentence)
         print('')
@@ -152,8 +153,6 @@ def evaluateRandomly(encoder, variator, hidden_variator, decoder, n=10):
 
 ##MAIN
 file_name = 'chem'
-input_lang, output_lang, pairs, y_s = prepare_single_data(file_name, True)
-print(random.choice(pairs))
 print("Device: " + str(device), flush=True)
 
 
@@ -161,10 +160,11 @@ num_sub_seqs = math.ceil(MAX_LENGTH / SUB_SEQ_LEN)
 
 hidden_size = HIDDEN_SIZE
 batch_size = 32
-num_epochs = 150
-input_lang, output_lang, train_dataloader = get_dataloader(file_name, batch_size)
+num_epochs = 50
+input_lang, output_lang, train_dataloader, num_bins, pairs, y_s = get_dataloader(file_name, batch_size)
+print(random.choice(pairs))
 
-encoder = EncoderRNN(input_lang.n_chars, hidden_size).to(device)
+encoder = EncoderRNN(input_lang.n_chars, hidden_size, num_bins).to(device)
 variator = Variator(hidden_size)
 hidden_variator = Variator(hidden_size, output_size=num_sub_seqs * hidden_size)
 decoder = AttnDecoderRNN(hidden_size, output_lang.n_chars).to(device)
@@ -174,14 +174,14 @@ variator.to(device)
 hidden_variator.to(device)
 decoder.to(device)
 print("begin train", flush=True)
-train(train_dataloader, encoder, variator, hidden_variator, decoder, num_epochs, print_every=5, plot_every=5)
+train(train_dataloader, encoder, variator, hidden_variator, decoder, num_epochs, y_s, print_every=5, plot_every=5)
 
 full_model = (encoder, variator, hidden_variator, decoder)
 
 torch.save(full_model, 'model.pt')
 encoder.eval()
 decoder.eval()
-evaluateRandomly(encoder, variator, hidden_variator, decoder, n = 100)
+evaluateRandomly(encoder, variator, hidden_variator, decoder, y_s, n = 100)
 #TODO: add scheduler.
 #Add classifier to "Y". (Sort things into "bins". )
 # Run things properly. 
