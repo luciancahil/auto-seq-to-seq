@@ -65,10 +65,11 @@ def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder
 
         encoder_outputs, encoder_hidden = encoder(input_tensor, y_s, train=True)
         variator_outputs, mu, log_var = variator(encoder_outputs, y_s, isTraining = True)
-        # make sure that hidden and encoder both have num_batch x seq_length * hidden_dims as shapes
-        encoder_hidden = encoder_hidden.squeeze().unsqueeze(dim = 1)
         hidden_variator_outputs, hid_mu, hid_logvar = hidden_variator(encoder_hidden, y_s, isTraining = True)
+        breakpoint()
+        # go from batchsize x 1 x hiddenshape to 1 x batchsize x hidden_shape
         hidden_variator_outputs = hidden_variator_outputs.squeeze().unsqueeze(dim = 0)
+        breakpoint()
         decoder_outputs, _, _ = decoder(variator_outputs, hidden_variator_outputs, is_training = True, target_tensor=target_tensor)
 
         means = [mu, hid_mu]

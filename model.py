@@ -54,8 +54,6 @@ class EncoderRNN(nn.Module):
         self.dropout = nn.Dropout(dropout_p)
 
     def forward(self, input, y_s, train=False):
-        print("in model")
-
         embedded = self.embedding(input)
         y_embedded = self.embedding(y_s)
         if(train):
@@ -65,6 +63,8 @@ class EncoderRNN(nn.Module):
         y_embedded = torch.unsqueeze(y_embedded, dim = 0)
         
         output, hidden = self.gru(embedded, y_embedded)
+        # make sure that hidden and encoder both have num_batch x seq_length x hidden_dims as shapes
+        hidden = hidden.squeeze().unsqueeze(dim = 1)
         return output, hidden
     
 class BahdanauAttention(nn.Module):
@@ -165,6 +165,7 @@ class Variator(nn.Module):
         y_s = y_s.unsqueeze(1).expand(-1, x.shape[1], 1)
         x = torch.cat((x, y_s), dim=2)
         x = self.decode_layer(x)
+
         return x
 
     def reparameterize(self, x, log_var):

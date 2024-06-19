@@ -17,41 +17,13 @@ featurizer = dc.feat.MolGraphConvFeaturizer(use_edges=True)
 
 MAX_MOLECULE_SIZE = MAX_LENGTH
 
-def get_latents(model, x):
-    x = model[0](x)
+def get_latents(model, x, y_s):
+    # encoder
+    x = model[0](x, y_s)
+    # first hal of the variators
     output_latent, _ = model[1].encode(x[0])
     hidden_latent, _ = model[2].encode(x[1])
     return output_latent, hidden_latent
-
-#MAIN
-try:
-    NUM_SEEDS = int(sys.argv[1])
-except(Exception):
-    NUM_SEEDS = 6
-
-def interpolate(tensor_one, tensor_two, numpoints = 5):
-    alphas = [1 / i for i in range(1, numpoints)]
-    interpolated_latents = [torch.add(torch.sub(tensor_one, tensor_two, alpha = a), tensor_two) for a in alphas]
-    return interpolated_latents
-
-input, _, input_lang, output_lang = get_data_tensors('chem')
-input = input[:NUM_SEEDS]
-model = torch.load(model_path, map_location=device)
-print("Starting interpolation")
-# first one is the output, second is the hidden
-latents = get_latents(model, input)
-interpolated_latents = []
-interpolated_hidden_latents = []
-
-for i in range(len(latents[0]) - 1):
-    for j in range(i + 1, len(latents[0])):
-        # pairs of output_latents
-        l_1 = latents[0][i,:,:].unsqueeze(dim = 0)
-        l_2 = latents[0][j,:,:].unsqueeze(dim = 0)
-        interpolated_latents += interpolate(l_1, l_2)
-        l_1 = latents[1][0,i,:].unsqueeze(dim = 0)
-        l_2 = latents[1][0,j,:].unsqueeze(dim = 0)
-        interpolated_hidden_latents += interpolate(l_1, l_2)
 
 def repair_smiles(smiles):
     mol = Chem.MolFromSmiles(smiles)
@@ -69,15 +41,64 @@ def repair_smiles(smiles):
     
     return smiles, False
 
+def interpolate(tensor_one, tensor_two, numpoints = 5):
+    alphas = [1 / i for i in range(1, numpoints)]
+    interpolated_latents = [torch.add(torch.sub(tensor_one, tensor_two, alpha = a), tensor_two) for a in alphas]
+    return interpolated_latents
 
+#MAIN
+try:
+    NUM_SEEDS = int(sys.argv[1])
+except(Exception):
+    NUM_SEEDS = 6
 
+input, _, input_lang, output_lang, y_s, num_bins, _ = get_data_tensors('chem')
+input = input[:NUM_SEEDS]
+y_s = y_s[:NUM_SEEDS]
+model = torch.load(model_path, map_location=device)
+print("Starting interpolation")
+# first one is the output, second is the hidden
+latents = get_latents(model, input, y_s)
+interpolated_latents = []
+interpolated_hidden_latents = []
+interpolated_ys = []
+
+for i in range(len(latents[0]) - 1):
+    for j in range(i + 1, len(latents[0])):
+        # pairs of output_latents
+        l_1 = latents[0][i,:,:].unsqueeze(dim = 0)
+        l_2 = latents[0][j,:,:].unsqueeze(dim = 0)
+        interpolated_latent = interpolate(l_1, l_2)
+        l_1 = latents[1][i,:,:].unsqueeze(dim = 0)
+        l_2 = latents[1][j,:,:].unsqueeze(dim = 0)
+        interpolated_hidden_latent = interpolate(l_1, l_2)
+
+        y_1 = y_s[i]
+        y_2 = y_s[j]
+
+        # add the first element once no matter what
+        interpolated_latents += interpolated_latent
+        interpolated_hidden_latents += interpolated_hidden_latent
+        interpolated_ys += [y_1] * (NUM_POINTS - 1)
+
+        # if the y's are diferent, add another copy o both latents, as well as the second y
+        if(y_1.item() != y_2.item()):
+            interpolated_latents += interpolated_latent
+            interpolated_hidden_latents += interpolated_hidden_latent
+            interpolated_ys += [y_2] * (NUM_POINTS - 1)
+
+        
+
+        
 input_latents = torch.cat(interpolated_latents, dim = 0)
-hidden_latents = torch.cat(interpolated_hidden_latents, dim = 0).unsqueeze(dim = 0)
-
+hidden_latents = torch.cat(interpolated_hidden_latents, dim = 0)
+ys_latents = torch.stack(interpolated_ys)
 # the decoder
-input_latents = model[1].decode(input_latents)
-hidden_latents= model[2].decode(hidden_latents)
-
+# How do I want to do this?
+input_latents = model[1].decode(input_latents, ys_latents)
+hidden_latents= model[2].decode(hidden_latents, ys_latents)
+# go from batchsize x 1 x hiddenshape to 1 x batchsize x hidden_shape
+hidden_latents=hidden_latents.squeeze().unsqueeze(dim = 0)
 decoder_outputs,_,_ = model[3](input_latents, hidden_latents)
 _, topi = decoder_outputs.topk(1)
 decoded_ids = topi.squeeze()

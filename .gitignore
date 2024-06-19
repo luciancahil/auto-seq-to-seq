@@ -1,4 +1,8 @@
 *.pyc
 
 data/*
+
+!data/chem.txt
+
 *.pt
+
