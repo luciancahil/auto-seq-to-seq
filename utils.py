@@ -85,7 +85,7 @@ def normalizeYs(y_s):
     quantiles = np.quantile(y_s, np.linspace(0, 1, num_bins + 1))
     # drop first and last elements, which will be the smallest and largest values
     quantiles = quantiles[1:-1]
-    print(quantiles)
+    print("Quantile Cutoffs: " + str(quantiles))
 
     y_s = np.digitize(y_s, quantiles).tolist()
     

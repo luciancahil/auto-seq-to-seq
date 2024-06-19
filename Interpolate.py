@@ -119,7 +119,7 @@ _, topi = decoder_outputs.topk(1)
 decoded_ids = topi.squeeze()
 decoded_chems = idx_to_smiles(topi)
 
-valid_smiles = []
+valid_smiles = set()
 all_smiles  = []
 num_valid = 0
 all = len(decoded_chems)
@@ -127,7 +127,7 @@ file = open("Smiles.txt", mode='w')
 for smiles in decoded_chems:
     smiles, valid = repair_smiles(smiles)
     if valid and (smiles not in seed_smiles):
-        valid_smiles.append(smiles)
+        valid_smiles.add(smiles)
         num_valid += 1
     
     all_smiles.append(smiles)
