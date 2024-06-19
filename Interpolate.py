@@ -46,6 +46,20 @@ def interpolate(tensor_one, tensor_two, numpoints = 5):
     interpolated_latents = [torch.add(torch.sub(tensor_one, tensor_two, alpha = a), tensor_two) for a in alphas]
     return interpolated_latents
 
+def idx_to_smiles(indicies):
+    smiles = []
+    for decoded_ids in indicies:
+        decoded_chars = []
+        for idx in decoded_ids:
+            if idx.item() == EOS_token:
+                #decoded_chars.append('<EOS>')
+                break
+            decoded_chars.append(output_lang.index2char[idx.item()])
+        
+        smiles.append("".join(decoded_chars))
+    
+    return smiles
+
 #MAIN
 try:
     NUM_SEEDS = int(sys.argv[1])
@@ -55,6 +69,7 @@ except(Exception):
 input, _, input_lang, output_lang, y_s, num_bins, _ = get_data_tensors('chem')
 input = input[:NUM_SEEDS]
 y_s = y_s[:NUM_SEEDS]
+seed_smiles = idx_to_smiles(input)
 model = torch.load(model_path, map_location=device)
 print("Starting interpolation")
 # first one is the output, second is the hidden
@@ -102,17 +117,7 @@ hidden_latents=hidden_latents.squeeze().unsqueeze(dim = 0)
 decoder_outputs,_,_ = model[3](input_latents, hidden_latents)
 _, topi = decoder_outputs.topk(1)
 decoded_ids = topi.squeeze()
-decoded_chems = []
-
-for decoded_ids in topi.squeeze():
-    decoded_chars = []
-    for idx in decoded_ids:
-        if idx.item() == EOS_token:
-            #decoded_chars.append('<EOS>')
-            break
-        decoded_chars.append(output_lang.index2char[idx.item()])
-    
-    decoded_chems.append("".join(decoded_chars))
+decoded_chems = idx_to_smiles(topi)
 
 valid_smiles = []
 all_smiles  = []
@@ -121,13 +126,18 @@ all = len(decoded_chems)
 file = open("Smiles.txt", mode='w')
 for smiles in decoded_chems:
     smiles, valid = repair_smiles(smiles)
-    if valid:
+    if valid and (smiles not in seed_smiles):
         valid_smiles.append(smiles)
         num_valid += 1
     
     all_smiles.append(smiles)
 
-file.write("Valid Smiles:\n")
+file.write("Seeds:\n")
+for smile in seed_smiles:
+    file.write(smile)
+    file.write('\n')
+
+file.write("\n\nValid Smiles:\n")
 
 for smile in valid_smiles:
     file.write(smile)
