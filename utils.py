@@ -96,7 +96,7 @@ def normalizeYs(y_s):
     
 
 
-def read_single_lang(lang, reverse=False):
+def read_single_lang(lang, reverse=False, prevLang = None):
     print("Reading lines...")
 
     # Read the file and split into lines
@@ -116,6 +116,7 @@ def read_single_lang(lang, reverse=False):
     else:
         pairs = [[l, l, 0] for l in lines]
 
+    
     input_lang = Lang(lang)
     output_lang = Lang(lang)
     print("Read %s sentence pairs" % len(pairs))
@@ -199,8 +200,9 @@ def get_dataloader(file_name, batch_size):
     return input_lang, output_lang, train_dataloader, num_bins, pairs, y_s
 
 
-def get_data_tensors(file_name):
-    input_lang, output_lang, pairs, y_s, num_bins = prepare_single_data(file_name, True)
+# fix this. Allow an input_lang to be specified.
+def get_data_tensors(file_name, prev_lang = None):
+    input_lang, output_lang, pairs, y_s, num_bins = prepare_single_data(file_name, True, prev_lang)
     n = len(pairs)
     input_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
     target_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
@@ -231,15 +233,19 @@ def prepareData(lang1, lang2, reverse=False):
     return input_lang, output_lang, pairs
 
 
-def prepare_single_data(lang1, reverse=False):
-    input_lang, output_lang, pairs, y_s, num_bins = read_single_lang(lang1, reverse)
+def prepare_single_data(lang1, reverse=False, prevLang = None):
+    input_lang, output_lang, pairs, y_s, num_bins = read_single_lang(lang1, reverse, prevLang)
 
-    print("Trimmed to %s sentence pairs" % len(pairs))
-    print("Counting chars...")
-    for pair in pairs:
-        input_lang.addSentence(pair[0])
-        output_lang.addSentence(pair[1])
-    print("Counted chars:")
+    if(prevLang is None):
+        print("Trimmed to %s sentence pairs" % len(pairs))
+        print("Counting chars...")
+        for pair in pairs:
+            input_lang.addSentence(pair[0])
+            output_lang.addSentence(pair[1])
+        print("Counted chars:")
+    else:
+        input_lang = prevLang
+        output_lang = prevLang
     print(input_lang.name, input_lang.n_chars)
     print(output_lang.name, output_lang.n_chars)
     return input_lang, output_lang, pairs, y_s, num_bins

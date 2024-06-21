@@ -183,7 +183,7 @@ num_sub_seqs = math.ceil(MAX_LENGTH / SUB_SEQ_LEN)
 
 hidden_size = HIDDEN_SIZE
 batch_size = 32
-num_epochs = 1
+num_epochs = 75
 input_lang, output_lang, train_dataloader, num_bins, pairs, y_s = get_dataloader(file_name, batch_size)
 print(random.choice(pairs))
 
@@ -205,5 +205,3 @@ torch.save(full_model, 'model.pt')
 encoder.eval()
 decoder.eval()
 evaluateRandomly(encoder, variator, hidden_variator, decoder, y_s, n = 100)
-
-
