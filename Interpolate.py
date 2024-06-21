@@ -190,9 +190,9 @@ ys_latent_gen = torch.tensor([target_bin] * len(ys_latents_inter))
 
 # decode interpolated smiles
 decoded_chems_inter = decode_to_smiles(input_latents_inter, hidden_latents_inter, ys_latents_inter)
-write_smiles_to_file(decoded_chems_inter, "Interpolated Smiles.txt")
+write_smiles_to_file(decoded_chems_inter, "Interpolated_Smiles.txt")
 
 
 decoded_chems_gen = decode_to_smiles(input_latents_gen, hidden_latents_gen, ys_latent_gen)
-write_smiles_to_file(decoded_chems_gen, "Generated Smiles.txt")
+write_smiles_to_file(decoded_chems_gen, "Generated_Smiles.txt")
 print('done!')
