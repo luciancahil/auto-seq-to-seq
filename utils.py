@@ -184,6 +184,8 @@ def indexesFromSentence(lang, sentence):
 def tensorFromSentence(lang, sentence):
     indexes = indexesFromSentence(lang, sentence)
     indexes.append(EOS_token)
+    padding = [0] * max(0, MAX_LENGTH - len(indexes))
+    indexes += padding
     return torch.tensor(indexes, dtype=torch.long, device=DEVICE).view(1, -1)
 
 def tensorsFromPair(pair, input_lang, output_lang):

@@ -1,6 +1,6 @@
 import sys
 import torch
-from utils import DEVICE, MAX_LENGTH, read_single_lang, filterWords, get_data_tensors
+from utils import DEVICE, MAX_LENGTH, get_data_tensors, tensorFromSentence
 import deepchem as dc
 import torch.nn.functional as F
 device = DEVICE
@@ -56,7 +56,7 @@ def idx_to_smiles(indicies):
             if idx.item() == EOS_token:
                 #decoded_chars.append('<EOS>')
                 break
-            decoded_chars.append(output_lang.index2char[idx.item()])
+            decoded_chars.append(lang.index2char[idx.item()])
         
         smiles.append("".join(decoded_chars))
     
@@ -144,16 +144,34 @@ except(Exception):
 
 # if a positive number, we want that bin. If -1, we will target the largest bin.
 target_bin = -1
+# objects:
+# 0: The RNN encoder
+# 1: The variator for encoder outputs
+# 2: The variator for the encoder hidden state
+# 3: The RNN Decoder
+# 4: The Language object
+# 5: The cutof points that tell wether a given value goes in a certain bin.
+model = torch.load(model_path, map_location=device)
+lang = model[4]
+quantiles = model[5]
 
+seeds = open("data/seeds.txt")
+seeds = seeds.readlines()
 
-input, _, input_lang, output_lang, y_s, num_bins, _ = get_data_tensors('chem')
-input = input[:NUM_SEEDS]
+# turn seeds into
+input = [tensorFromSentence(lang, line.split(',')[0]).squeeze() for line in seeds]
+input = torch.stack(input)
+y_s = [line.split(',')[1] for line in seeds]
+y_s = torch.tensor(np.digitize(y_s, quantiles).tolist())
+
 y_s = y_s[:NUM_SEEDS]
 seed_smiles = idx_to_smiles(input)
 model = torch.load(model_path, map_location=device)
+breakpoint()
 print("Starting interpolation")
-# first one is the output, second is the hidden
+
 latents = get_latents(model, input, y_s)
+# first one is the output, second is the hidden
 interpolated_latents, interpolated_hidden_latents, interpolated_ys = get_interpolated_latents(latents, y_s)
 
         
