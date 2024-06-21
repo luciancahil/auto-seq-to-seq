@@ -67,7 +67,7 @@ def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder
         variator_outputs, mu, log_var = variator(encoder_outputs, y_s, isTraining = True)
         hidden_variator_outputs, hid_mu, hid_logvar = hidden_variator(encoder_hidden, y_s, isTraining = True)
         # go from batchsize x 1 x hiddenshape to 1 x batchsize x hidden_shape
-        hidden_variator_outputs = hidden_variator_outputs.squeeze().unsqueeze(dim = 0)
+        hidden_variator_outputs = hidden_variator_outputs.squeeze(dim=1).unsqueeze(dim = 0)
         decoder_outputs, _, _ = decoder(variator_outputs, hidden_variator_outputs, is_training = True, target_tensor=target_tensor)
 
         means = [mu, hid_mu]
@@ -123,6 +123,13 @@ def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epoch
             print_loss_total = 0
             print('%s (%d %d%%) %.4f' % (timeSince(start, epoch / n_epochs),
                                         epoch, epoch / n_epochs * 100, print_loss_avg), flush=True)
+                # Log the learning rates for all optimizers
+            current_lr_encoder = encoder_optimizer.param_groups[0]['lr']
+            current_lr_decoder = decoder_optimizer.param_groups[0]['lr']
+            current_lr_variator = variator_optimizer.param_groups[0]['lr']
+            current_lr_hidden_variator = hidden_variator_optimizer.param_groups[0]['lr']
+            
+            print(f'Epoch {epoch+1}/{num_epochs}, Encoder LR: {current_lr_encoder}, Decoder LR: {current_lr_decoder}, Variator LR: {current_lr_variator}, Hidden Variator LR: {current_lr_hidden_variator}')
 
         if epoch % plot_every == 0:
             plot_loss_avg = plot_loss_total / plot_every
@@ -133,11 +140,14 @@ def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epoch
 def evaluate(encoder, variator, hidden_variator, decoder, sentence, input_lang, output_lang, y):
     with torch.no_grad():
         input_tensor = tensorFromSentence(input_lang, sentence)
+        input_tensor = input_tensor.to(device)
+        y = y.to(device)
+
         encoder_outputs, encoder_hidden = encoder(input_tensor, y)
         variator_outputs,_,_ = variator(encoder_outputs, y)
-        hidden_vaiator_outputs,_,_ = hidden_variator(encoder_hidden, y)
-        decoder_outputs, decoder_hidden, decoder_attn = decoder(variator_outputs, hidden_vaiator_outputs)
-
+        hidden_variator_outputs,_,_ = hidden_variator(encoder_hidden, y)
+        hidden_variator_outputs = hidden_variator_outputs.squeeze(dim=1).unsqueeze(dim = 0)
+        decoder_outputs, decoder_hidden, decoder_attn = decoder(variator_outputs, hidden_variator_outputs)
         _, topi = decoder_outputs.topk(1)
         decoded_ids = topi.squeeze()
 
@@ -173,7 +183,7 @@ num_sub_seqs = math.ceil(MAX_LENGTH / SUB_SEQ_LEN)
 
 hidden_size = HIDDEN_SIZE
 batch_size = 32
-num_epochs = 150
+num_epochs = 1
 input_lang, output_lang, train_dataloader, num_bins, pairs, y_s = get_dataloader(file_name, batch_size)
 print(random.choice(pairs))
 
@@ -189,13 +199,11 @@ decoder.to(device)
 print("begin train", flush=True)
 train(train_dataloader, encoder, variator, hidden_variator, decoder, num_epochs, y_s, print_every=5, plot_every=5)
 
-full_model = (encoder, variator, hidden_variator, decoder)
+full_model = (encoder, variator, hidden_variator, decoder, input_lang)
 
 torch.save(full_model, 'model.pt')
 encoder.eval()
 decoder.eval()
 evaluateRandomly(encoder, variator, hidden_variator, decoder, y_s, n = 100)
-#TODO: add scheduler.
-#Add classifier to "Y". (Sort things into "bins". )
-# Run things properly. 
+
 

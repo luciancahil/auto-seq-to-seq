@@ -64,7 +64,7 @@ class EncoderRNN(nn.Module):
         
         output, hidden = self.gru(embedded, y_embedded)
         # make sure that hidden and encoder both have num_batch x seq_length x hidden_dims as shapes
-        hidden = hidden.squeeze().unsqueeze(dim = 1)
+        hidden = hidden.squeeze(dim=0).unsqueeze(dim = 1)
         return output, hidden
     
 class BahdanauAttention(nn.Module):
