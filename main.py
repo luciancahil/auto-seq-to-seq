@@ -11,7 +11,7 @@ import numpy as np
 from torch.utils.data import TensorDataset, DataLoader, RandomSampler
 
 from Lang import EOS_token
-from utils import DEVICE, MAX_LENGTH, SUB_SEQ_LEN, HIDDEN_SIZE, timeSince, prepare_single_data, tensorFromSentence, get_dataloader
+from utils import DEVICE, MAX_LENGTH, SUB_SEQ_LEN, HIDDEN_SIZE, timeSince, tensorFromSentence, get_dataloader
 
 from model import EncoderRNN, AttnDecoderRNN, Variator
 
@@ -184,9 +184,9 @@ num_sub_seqs = math.ceil(MAX_LENGTH / SUB_SEQ_LEN)
 hidden_size = HIDDEN_SIZE
 batch_size = 32
 num_epochs = 75
-input_lang, output_lang, train_dataloader, num_bins, pairs, y_s = get_dataloader(file_name, batch_size)
+input_lang, output_lang, train_dataloader, quantiles, pairs, y_s = get_dataloader(file_name, batch_size)
+num_bins = len(quantiles) + 1
 print(random.choice(pairs))
-
 encoder = EncoderRNN(input_lang.n_chars, hidden_size, num_bins).to(device)
 variator = Variator(hidden_size, num_bins)
 hidden_variator = Variator(hidden_size, num_bins, output_size=num_sub_seqs * hidden_size)
@@ -199,7 +199,7 @@ decoder.to(device)
 print("begin train", flush=True)
 train(train_dataloader, encoder, variator, hidden_variator, decoder, num_epochs, y_s, print_every=5, plot_every=5)
 
-full_model = (encoder, variator, hidden_variator, decoder, input_lang)
+full_model = (encoder, variator, hidden_variator, decoder, input_lang, quantiles)
 
 torch.save(full_model, 'model.pt')
 encoder.eval()

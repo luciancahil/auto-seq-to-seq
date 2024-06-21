@@ -3,6 +3,6 @@
 data/*
 
 !data/chem.txt
-
+!data/seeds.txt
 *.pt
 

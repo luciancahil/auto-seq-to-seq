@@ -137,13 +137,13 @@ def write_smiles_to_file(inputs, filename):
 
     file.write("There were {} valid smiles, out of {}".format(num_valid, all))
 #MAIN
-try:
-    NUM_SEEDS = int(sys.argv[1])
-except(Exception):
-    NUM_SEEDS = 6
-
 # if a positive number, we want that bin. If -1, we will target the largest bin.
-target_bin = -1
+try:
+    target_bin = int(sys.argv[1])
+except(Exception):
+    target_bin = -1
+
+
 # objects:
 # 0: The RNN encoder
 # 1: The variator for encoder outputs
@@ -164,10 +164,8 @@ input = torch.stack(input)
 y_s = [line.split(',')[1] for line in seeds]
 y_s = torch.tensor(np.digitize(y_s, quantiles).tolist())
 
-y_s = y_s[:NUM_SEEDS]
 seed_smiles = idx_to_smiles(input)
 model = torch.load(model_path, map_location=device)
-breakpoint()
 print("Starting interpolation")
 
 latents = get_latents(model, input, y_s)

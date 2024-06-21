@@ -90,7 +90,7 @@ def normalizeYs(y_s):
     y_s = np.digitize(y_s, quantiles).tolist()
     
 
-    return y_s, num_bins
+    return y_s, quantiles
 
 
     
@@ -128,11 +128,11 @@ def read_single_lang(lang, reverse=False, prevLang = None):
     y_s = [pair[2] for pair in pairs]
     pairs = [pair[0:2] for pair in pairs]
 
-    y_s, num_bins = normalizeYs(y_s)
+    y_s, quantiles = normalizeYs(y_s)
 
 
 
-    return input_lang, output_lang, pairs, y_s, num_bins
+    return input_lang, output_lang, pairs, y_s, quantiles
 
 def readLang(lang):
     print("Reading lines...")
@@ -194,17 +194,17 @@ def tensorsFromPair(pair, input_lang, output_lang):
     return (input_tensor, target_tensor)
 
 def get_dataloader(file_name, batch_size):
-    input_tensor, output_tensor, input_lang, output_lang, y_s, num_bins, pairs = get_data_tensors(file_name)
+    input_tensor, output_tensor, input_lang, output_lang, y_s, quantiles, pairs = get_data_tensors(file_name)
     train_data = TensorDataset(input_tensor, output_tensor, y_s)
 
     train_sampler = RandomSampler(train_data)
     train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=batch_size)
-    return input_lang, output_lang, train_dataloader, num_bins, pairs, y_s
+    return input_lang, output_lang, train_dataloader, quantiles, pairs, y_s
 
 
 # fix this. Allow an input_lang to be specified.
 def get_data_tensors(file_name, prev_lang = None):
-    input_lang, output_lang, pairs, y_s, num_bins = prepare_single_data(file_name, True, prev_lang)
+    input_lang, output_lang, pairs, y_s, quantiles = prepare_single_data(file_name, True, prev_lang)
     n = len(pairs)
     input_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
     target_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
@@ -218,7 +218,7 @@ def get_data_tensors(file_name, prev_lang = None):
         target_ids[idx, :len(tgt_ids)] = tgt_ids
     
     
-    return torch.LongTensor(input_ids).to(DEVICE), torch.LongTensor(target_ids).to(DEVICE), input_lang, output_lang, torch.LongTensor(y_s), num_bins, pairs
+    return torch.LongTensor(input_ids).to(DEVICE), torch.LongTensor(target_ids).to(DEVICE), input_lang, output_lang, torch.LongTensor(y_s), quantiles, pairs
 
 def prepareData(lang1, lang2, reverse=False):
     input_lang, output_lang, pairs = readLangs(lang1, lang2, reverse)
@@ -236,7 +236,7 @@ def prepareData(lang1, lang2, reverse=False):
 
 
 def prepare_single_data(lang1, reverse=False, prevLang = None):
-    input_lang, output_lang, pairs, y_s, num_bins = read_single_lang(lang1, reverse, prevLang)
+    input_lang, output_lang, pairs, y_s, quantiles = read_single_lang(lang1, reverse, prevLang)
 
     if(prevLang is None):
         print("Trimmed to %s sentence pairs" % len(pairs))
@@ -250,4 +250,4 @@ def prepare_single_data(lang1, reverse=False, prevLang = None):
         output_lang = prevLang
     print(input_lang.name, input_lang.n_chars)
     print(output_lang.name, output_lang.n_chars)
-    return input_lang, output_lang, pairs, y_s, num_bins
+    return input_lang, output_lang, pairs, y_s, quantiles

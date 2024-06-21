@@ -2,6 +2,14 @@
 
 A sequence to sequence model that focuses on generating new molecules.
 
+## Environment
+
+To setup the environment, run the environment.yml file with:
+
+````
+conda env create -f environment.yml
+````
+
 ## Data Formating
 By default, the model will be trained according to data in "data/chem.txt".
 
@@ -30,6 +38,21 @@ Once the hyperparameters are satisfactory. Run "python main.py"
 
 ## Interpolation.
 
-Once you've run "main.py" the model should be saved as "model.pt". Once that file has been created, run "Interpolate.py". This will then cause the molecule to begin attemping to generate new molecules using the first few molecules in chem.txt as a starting seed.
+Once you've run "main.py" the model should be saved as "model.pt". Once that file has been created, run "Interpolate.py". This will then cause the molecule to begin attemping to generate new molecules using the molecules in the "data/seeds.txt" file.
 
-If you wish to change the number of seeds used, add a number at the end. For example, if you want 10 seeds, run "python Interpolate.py 10"
+If you wish to use different seeds, alter the seeds.txt file, formatted with the exact way as files in chem.txt.
+
+
+## Biased generation
+
+The values provided in chem.txt and seeds.txt are used to classify the molecules. The molecuels with the smallest 5% of values go into the first bin, the next 5% go into the last bin, and so on.
+
+This is to help bias the generation process. By default, the model tries to generate molecules that belong to the largest bin.
+
+If you wish to target a different bin, simply add the bin you wish to target as a command line argument. For instance, if you want the smallest bin, type the following into the command line.
+
+````
+Python Interpolate.py 0
+````
+
+Note that by default, 20 bins are generated. If you wish to change the number of bins generated, edit the "num_bins" field in utils.py.
