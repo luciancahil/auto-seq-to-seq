@@ -62,12 +62,12 @@ def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder
         decoder_optimizer.zero_grad()
         variator_optimizer.zero_grad()
         hidden_variator_optimizer.zero_grad()
-
-        encoder_outputs, encoder_hidden = encoder(input_tensor, y_s, train=True)
-        variator_outputs, mu, log_var = variator(encoder_outputs, y_s, isTraining = True)
-        hidden_variator_outputs, hid_mu, hid_logvar = hidden_variator(encoder_hidden, y_s, isTraining = True)
+        encoder_outputs, encoder_hidden = encoder(input_tensor, train=True)
+        variator_outputs, mu, log_var = variator(encoder_outputs, isTraining = True)
+        hidden_variator_outputs, hid_mu, hid_logvar = hidden_variator(encoder_hidden, isTraining = True)
         # go from batchsize x 1 x hiddenshape to 1 x batchsize x hidden_shape
         hidden_variator_outputs = hidden_variator_outputs.squeeze(dim=1).unsqueeze(dim = 0)
+
         decoder_outputs, _, _ = decoder(variator_outputs, hidden_variator_outputs, is_training = True, target_tensor=target_tensor)
 
         means = [mu, hid_mu]
@@ -88,7 +88,7 @@ def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder
     return total_loss / len(dataloader), recon_loss / len(dataloader), kl_loss / len(dataloader)
 
 
-def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epochs, y_s, learning_rate=0.001,
+def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epochs, learning_rate=0.001,
                print_every=100, plot_every=100):
     start = time.time()
     plot_losses = []
@@ -137,15 +137,14 @@ def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epoch
             plot_loss_total = 0
 
 
-def evaluate(encoder, variator, hidden_variator, decoder, sentence, input_lang, output_lang, y):
+def evaluate(encoder, variator, hidden_variator, decoder, sentence, input_lang, output_lang):
     with torch.no_grad():
         input_tensor = tensorFromSentence(input_lang, sentence)
         input_tensor = input_tensor.to(device)
-        y = y.to(device)
 
-        encoder_outputs, encoder_hidden = encoder(input_tensor, y)
-        variator_outputs,_,_ = variator(encoder_outputs, y)
-        hidden_variator_outputs,_,_ = hidden_variator(encoder_hidden, y)
+        encoder_outputs, encoder_hidden = encoder(input_tensor)
+        variator_outputs,_,_ = variator(encoder_outputs)
+        hidden_variator_outputs,_,_ = hidden_variator(encoder_hidden)
         hidden_variator_outputs = hidden_variator_outputs.squeeze(dim=1).unsqueeze(dim = 0)
         decoder_outputs, decoder_hidden, decoder_attn = decoder(variator_outputs, hidden_variator_outputs)
         _, topi = decoder_outputs.topk(1)
@@ -160,14 +159,13 @@ def evaluate(encoder, variator, hidden_variator, decoder, sentence, input_lang, 
     return decoded_chars, decoder_attn
 
 
-def evaluateRandomly(encoder, variator, hidden_variator, decoder, y_s, n=10):
+def evaluateRandomly(encoder, variator, hidden_variator, decoder, n=10):
     for i in range(n):
         index = random.randint(0, len(pairs))
         pair = pairs[index]
-        y = y_s[index].unsqueeze(dim = 0)
         print('>', pair[0])
         print('=', pair[1])
-        output_chars, _ = evaluate(encoder, variator, hidden_variator, decoder, pair[0], input_lang, output_lang, y)
+        output_chars, _ = evaluate(encoder, variator, hidden_variator, decoder, pair[0], input_lang, output_lang)
         output_sentence = ''.join(output_chars)
         print('<', output_sentence)
         print('')
@@ -184,12 +182,15 @@ num_sub_seqs = math.ceil(MAX_LENGTH / SUB_SEQ_LEN)
 hidden_size = HIDDEN_SIZE
 batch_size = 32
 num_epochs = 75
-input_lang, output_lang, train_dataloader, quantiles, pairs, y_s = get_dataloader(file_name, batch_size)
-num_bins = len(quantiles) + 1
+# how many dimensions we encode each character
+latent_size = 100
+# total size of the latent matrix compressed into a vector
+input_lang, output_lang, train_dataloader, endpoints, pairs, y_s = get_dataloader(file_name, batch_size)
 print(random.choice(pairs))
-encoder = EncoderRNN(input_lang.n_chars, hidden_size, num_bins).to(device)
-variator = Variator(hidden_size, num_bins)
-hidden_variator = Variator(hidden_size, num_bins, output_size=num_sub_seqs * hidden_size)
+encoder = EncoderRNN(input_lang.n_chars, hidden_size).to(device)
+variator = Variator(hidden_size, latent_size)
+# has that output size so we don't have to reduce decaying gradients; every ~15 chars gets a fresh hidden state.
+hidden_variator = Variator(hidden_size, latent_size, output_size=num_sub_seqs * hidden_size)
 decoder = AttnDecoderRNN(hidden_size, output_lang.n_chars).to(device)
 
 encoder.to(device)
@@ -197,11 +198,11 @@ variator.to(device)
 hidden_variator.to(device)
 decoder.to(device)
 print("begin train", flush=True)
-train(train_dataloader, encoder, variator, hidden_variator, decoder, num_epochs, y_s, print_every=5, plot_every=5)
+train(train_dataloader, encoder, variator, hidden_variator, decoder, num_epochs, print_every=5, plot_every=5)
 
-full_model = (encoder, variator, hidden_variator, decoder, input_lang, quantiles)
+full_model = (encoder, variator, hidden_variator, decoder, input_lang, endpoints)
 
 torch.save(full_model, 'model.pt')
 encoder.eval()
 decoder.eval()
-evaluateRandomly(encoder, variator, hidden_variator, decoder, y_s, n = 100)
+evaluateRandomly(encoder, variator, hidden_variator, decoder, n = 100)
