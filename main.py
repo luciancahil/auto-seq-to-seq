@@ -214,7 +214,7 @@ decoder.to(device)
 print("begin train", flush=True)
 train(train_dataloader, encoder, variator, hidden_variator, decoder, regression, num_epochs, print_every=5, plot_every=5)
 
-full_model = (encoder, variator, hidden_variator, decoder, input_lang, endpoints)
+full_model = (encoder, variator, hidden_variator, decoder, regression, input_lang, endpoints)
 
 torch.save(full_model, 'model.pt')
 encoder.eval()
