@@ -180,14 +180,14 @@ class Variator(nn.Module):
         return x, mu, log_var
     
 class LinearRegression(nn.Module):
-    def __init__(self, width, height, kernel_size, hidden_size, output_dim = 1):
-        super(Variator, self).__init__()
-        self.conv_one = nn.Conv2d(1, 1, kernel_size)
-        self.conv_two = nn.Conv2d(1, 1, kernel_size=kernel_size)
+    def __init__(self, width, height, kernel_size = 3, hidden_channels = 16, hidden_size = 10, output_dim = 1):
+        super(LinearRegression, self).__init__()
+        self.conv_one = nn.Conv2d(1, hidden_channels, kernel_size)
+        self.conv_two = nn.Conv2d(hidden_channels, 1, kernel_size)
         self.pool = nn.AvgPool2d(2, stride=2, padding=1)
         self.activation = nn.LeakyReLU()
-        new_width = math.ceil((math.ceil((width + 1 - kernel_size) / 2) + 1 - kernel_size)/2)
-        new_height = math.ceil((math.ceil((height + 1 - kernel_size) / 2) + 1 - kernel_size)/2)
+        new_width = math.ceil((math.ceil((width + 1 - kernel_size + 2) / 2) + 1 + 2 - kernel_size)/2)
+        new_height = math.ceil((math.ceil((height + 1 - kernel_size + 2) / 2) + 1 + 2 - kernel_size)/2)
         new_num_pixels = new_width * new_height
         self.hidden = nn.Linear(new_num_pixels, hidden_size)
         self.mem_hidden = nn.Linear(width, hidden_size)
@@ -196,6 +196,8 @@ class LinearRegression(nn.Module):
     
 
     def forward(self, sequence, memory, isTraining = False):
+        sequence = sequence.unsqueeze(dim = 1)
+
         sequence = self.conv_one(sequence)
         sequence = self.activation(sequence)
         sequence = self.pool(sequence)
@@ -204,10 +206,13 @@ class LinearRegression(nn.Module):
         sequence = self.activation(sequence)
         sequence = self.pool(sequence)
 
-        sequence = torch.flatten(sequence, start_dim=1, end_dim=2)
+
+        sequence = torch.flatten(sequence, start_dim=1, end_dim=3)
         sequence = self.hidden(sequence)
+        memory = torch.squeeze(memory, dim = 1)
         memory = self.mem_hidden(memory)
-        sequence = torch.cat((sequence, memory), dim = 0)
+        sequence = torch.cat((sequence, memory), dim = 1)
+        
 
         if(isTraining):
             sequence = self.dropout(sequence)

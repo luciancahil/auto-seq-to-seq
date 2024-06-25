@@ -8,12 +8,11 @@ from torch import optim
 import torch.nn.functional as F
 
 import numpy as np
-from torch.utils.data import TensorDataset, DataLoader, RandomSampler
 
 from Lang import EOS_token
 from utils import DEVICE, MAX_LENGTH, SUB_SEQ_LEN, HIDDEN_SIZE, timeSince, tensorFromSentence, get_dataloader
 
-from model import EncoderRNN, AttnDecoderRNN, Variator
+from model import EncoderRNN, AttnDecoderRNN, Variator, LinearRegression
 
 device = DEVICE
 
@@ -47,8 +46,9 @@ def loss_fn(outputs, target, criterion, mus, log_vars, kl_beta = 0.05):
 
     return recon_loss + kl_beta/len(mus) * kl_losses, recon_loss, kl_losses
 
-def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder_optimizer,
-          decoder_optimizer, variator_optimizer, hidden_variator_optimizer, criterion, percent_done):
+def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, regression, encoder_optimizer,
+        decoder_optimizer, variator_optimizer, hidden_variator_optimizer,regression_optimizer,
+        criterion, percent_done):
 
     total_loss = 0
     for data in (dataloader):
@@ -62,9 +62,12 @@ def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder
         decoder_optimizer.zero_grad()
         variator_optimizer.zero_grad()
         hidden_variator_optimizer.zero_grad()
+        regression_optimizer.zero_grad()
         encoder_outputs, encoder_hidden = encoder(input_tensor, train=True)
         variator_outputs, mu, log_var = variator(encoder_outputs, isTraining = True)
         hidden_variator_outputs, hid_mu, hid_logvar = hidden_variator(encoder_hidden, isTraining = True)
+        prediction = regression(mu, hid_mu)
+
         # go from batchsize x 1 x hiddenshape to 1 x batchsize x hidden_shape
         hidden_variator_outputs = hidden_variator_outputs.squeeze(dim=1).unsqueeze(dim = 0)
 
@@ -82,13 +85,14 @@ def train_epoch(dataloader, encoder, variator, hidden_variator, decoder, encoder
         decoder_optimizer.step()
         variator_optimizer.step()
         hidden_variator_optimizer.step()
+        regression_optimizer.step()
 
         total_loss += loss.item()
 
     return total_loss / len(dataloader), recon_loss / len(dataloader), kl_loss / len(dataloader)
 
 
-def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epochs, learning_rate=0.001,
+def train(train_dataloader, encoder, variator, hidden_variator, decoder, regression, n_epochs, learning_rate=0.001,
                print_every=100, plot_every=100):
     start = time.time()
     plot_losses = []
@@ -101,17 +105,20 @@ def train(train_dataloader, encoder, variator, hidden_variator, decoder, n_epoch
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
     variator_optimizer = optim.Adam(variator.parameters(), lr = learning_rate)
     hidden_variator_optimizer = optim.Adam(hidden_variator.parameters(), lr = learning_rate)
+    regression_optimizer = optim.Adam(regression.parameters(), lr = learning_rate)
+    
     scheduler = optim.lr_scheduler.CosineAnnealingLR(encoder_optimizer, T_max=num_epochs)
     scheduler_decode = optim.lr_scheduler.CosineAnnealingLR(decoder_optimizer, T_max=num_epochs)
     scheduler_variator = optim.lr_scheduler.CosineAnnealingLR(variator_optimizer, T_max=num_epochs)
     scheduler_hidden = optim.lr_scheduler.CosineAnnealingLR(hidden_variator_optimizer, T_max=num_epochs)
+    scheduler_regression = optim.lr_scheduler.CosineAnnealingLR(regression_optimizer, T_max=num_epochs)
 
-    schedulers = [scheduler, scheduler_decode, scheduler_hidden, scheduler_variator]
+    schedulers = [scheduler, scheduler_decode, scheduler_hidden, scheduler_variator, scheduler_regression]
 
     criterion = nn.NLLLoss()
 
     for epoch in range(1, n_epochs + 1):
-        loss, print_total_recon_loss, print_total_kl_loss = train_epoch(train_dataloader, encoder, variator, hidden_variator, decoder, encoder_optimizer, decoder_optimizer, variator_optimizer, hidden_variator_optimizer, criterion, (epoch - 1)/num_epochs)
+        loss, print_total_recon_loss, print_total_kl_loss = train_epoch(train_dataloader, encoder, variator, hidden_variator, decoder, regression, encoder_optimizer, decoder_optimizer, variator_optimizer, hidden_variator_optimizer, regression_optimizer, criterion, (epoch - 1)/num_epochs)
         print_loss_total += loss
         plot_loss_total += loss
 
@@ -192,13 +199,14 @@ variator = Variator(hidden_size, latent_size)
 # has that output size so we don't have to reduce decaying gradients; every ~15 chars gets a fresh hidden state.
 hidden_variator = Variator(hidden_size, latent_size, output_size=num_sub_seqs * hidden_size)
 decoder = AttnDecoderRNN(hidden_size, output_lang.n_chars).to(device)
+regression = LinearRegression(latent_size, MAX_LENGTH, )
 
 encoder.to(device)
 variator.to(device)
 hidden_variator.to(device)
 decoder.to(device)
 print("begin train", flush=True)
-train(train_dataloader, encoder, variator, hidden_variator, decoder, num_epochs, print_every=5, plot_every=5)
+train(train_dataloader, encoder, variator, hidden_variator, decoder, regression, num_epochs, print_every=5, plot_every=5)
 
 full_model = (encoder, variator, hidden_variator, decoder, input_lang, endpoints)
 
