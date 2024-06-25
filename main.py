@@ -194,7 +194,7 @@ num_sub_seqs = math.ceil(MAX_LENGTH / SUB_SEQ_LEN)
 
 hidden_size = HIDDEN_SIZE
 batch_size = 32
-num_epochs = 75
+num_epochs = 35
 # how many dimensions we encode each character
 latent_size = 100
 # total size of the latent matrix compressed into a vector
