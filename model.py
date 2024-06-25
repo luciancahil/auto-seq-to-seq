@@ -4,6 +4,7 @@ from torch import optim
 import torch.nn.functional as F
 from utils import MAX_LENGTH, DEVICE, SUB_SEQ_LEN, HIDDEN_SIZE
 from Lang import SOS_token, EOS_token
+import math
 
 device = DEVICE
 
@@ -44,25 +45,21 @@ class DecoderRNN(nn.Module):
         return output, hidden
 
 class EncoderRNN(nn.Module):
-    def __init__(self, input_size, hidden_size, num_bins, dropout_p=0.1):
+    def __init__(self, input_size, hidden_size, dropout_p=0.1):
         super(EncoderRNN, self).__init__()
         self.hidden_size = hidden_size
 
         self.embedding = nn.Embedding(input_size, hidden_size)
-        self.y_embedding = nn.Embedding(num_bins, hidden_size)
         self.gru = nn.GRU(hidden_size, hidden_size, batch_first=True)
         self.dropout = nn.Dropout(dropout_p)
 
-    def forward(self, input, y_s, train=False):
+    def forward(self, input, train=False):
         embedded = self.embedding(input)
-        y_embedded = self.embedding(y_s)
+        hidden = torch.zeros(1, embedded.shape[0], self.hidden_size)
         if(train):
             embedded = self.dropout(embedded)
-            y_embedded = self.dropout(y_embedded)
         
-        y_embedded = torch.unsqueeze(y_embedded, dim = 0)
-        
-        output, hidden = self.gru(embedded, y_embedded)
+        output, hidden = self.gru(embedded, hidden)
         # make sure that hidden and encoder both have num_batch x seq_length x hidden_dims as shapes
         hidden = hidden.squeeze(dim=0).unsqueeze(dim = 1)
         return output, hidden
@@ -145,25 +142,20 @@ class AttnDecoderRNN(nn.Module):
     
 
 class Variator(nn.Module):
-    def __init__(self, input_size, num_bins, hidden_size = 100, output_size = None):
+    def __init__(self, input_size, latent_size = 100, output_size = None):
         super(Variator, self).__init__()
         if(output_size == None):
             output_size = input_size
-        self.encode_mu = nn.Linear(input_size, hidden_size)
-        self.encode_log_var = nn.Linear(input_size, hidden_size)
-        self.decode_layer = nn.Linear(hidden_size + 1, output_size)
-        self.embed_condition = nn.Embedding(num_bins, 1)
-    
+        self.encode_mu = nn.Linear(input_size, latent_size)
+        self.encode_log_var = nn.Linear(input_size, latent_size)
+        self.decode_layer = nn.Linear(latent_size, output_size)    
 
     def encode(self, x):
         log_var = self.encode_log_var(x)
         x = self.encode_mu(x)
         return x, log_var
 
-    def decode(self, x, y_s):
-        y_s = self.embed_condition(y_s)
-        y_s = y_s.unsqueeze(1).expand(-1, x.shape[1], 1)
-        x = torch.cat((x, y_s), dim=2)
+    def decode(self, x):
         x = self.decode_layer(x)
 
         return x
@@ -176,13 +168,59 @@ class Variator(nn.Module):
         # Return sampled values
         return eps.mul(std).add_(x)
 
-    def forward(self, x, y_s, isTraining = False):
+    def forward(self, x, isTraining = False):
         mu, log_var = self.encode(x)
 
         if(isTraining):
             x = self.reparameterize(mu, log_var)
-            x = self.decode(x, y_s)
+            x = self.decode(x)
         else:
-            x = self.decode(mu, y_s)
+            x = self.decode(mu)
         
         return x, mu, log_var
+    
+class LinearRegression(nn.Module):
+    def __init__(self, width, height, kernel_size = 3, hidden_channels = 16, hidden_size = 10, output_dim = 1):
+        super(LinearRegression, self).__init__()
+        self.conv_one = nn.Conv2d(1, hidden_channels, kernel_size)
+        self.conv_two = nn.Conv2d(hidden_channels, 1, kernel_size)
+        self.pool = nn.AvgPool2d(2, stride=2, padding=1)
+        self.activation = nn.LeakyReLU()
+        new_width = math.ceil((math.ceil((width + 1 - kernel_size + 2) / 2) + 1 + 2 - kernel_size)/2)
+        new_height = math.ceil((math.ceil((height + 1 - kernel_size + 2) / 2) + 1 + 2 - kernel_size)/2)
+        new_num_pixels = new_width * new_height
+        self.hidden = nn.Linear(new_num_pixels, hidden_size)
+        self.mem_hidden = nn.Linear(width, hidden_size)
+        self.output = nn.Linear(2 * hidden_size, output_dim)
+        self.dropout = nn.Dropout(0.3)
+    
+
+    def forward(self, sequence, memory, isTraining = False):
+        sequence = sequence.unsqueeze(dim = 1)
+
+        sequence = self.conv_one(sequence)
+        sequence = self.activation(sequence)
+        sequence = self.pool(sequence)
+
+        sequence = self.conv_two(sequence)
+        sequence = self.activation(sequence)
+        sequence = self.pool(sequence)
+
+
+        sequence = torch.flatten(sequence, start_dim=1, end_dim=3)
+        sequence = self.hidden(sequence)
+        memory = torch.squeeze(memory, dim = 1)
+        memory = self.mem_hidden(memory)
+        sequence = torch.cat((sequence, memory), dim = 1)
+        
+
+        if(isTraining):
+            sequence = self.dropout(sequence)
+        
+        sequence = self.output(sequence)
+        return sequence
+
+
+
+
+

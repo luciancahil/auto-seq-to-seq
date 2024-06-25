@@ -13,7 +13,7 @@ import sys
 SUB_SEQ_LEN = 15
 HIDDEN_SIZE = 128
 MAX_LENGTH = 40
-MAX_NUM_SAMPLES = 200000
+MAX_NUM_SAMPLES = 1000
 NUM_BINS = -1
 
 def asMinutes(s):
@@ -82,15 +82,20 @@ def normalizeYs(y_s):
         num_bins = min(20, max(2, int(MAX_NUM_SAMPLES / 1000)))
     else:
         num_bins = NUM_BINS
+    
+    num_bins = 100
     quantiles = np.quantile(y_s, np.linspace(0, 1, num_bins + 1))
+    start = quantiles[1]
+    end = quantiles [-1]
+    endpoints = (start, end)
+    y_s = [(y - start)/(end - start) for y in y_s]
     # drop first and last elements, which will be the smallest and largest values
     quantiles = quantiles[1:-1]
     print("Quantile Cutoffs: " + str(quantiles))
 
-    y_s = np.digitize(y_s, quantiles).tolist()
     
 
-    return y_s, quantiles
+    return y_s, endpoints
 
 
     
@@ -128,11 +133,11 @@ def read_single_lang(lang, reverse=False, prevLang = None):
     y_s = [pair[2] for pair in pairs]
     pairs = [pair[0:2] for pair in pairs]
 
-    y_s, quantiles = normalizeYs(y_s)
+    y_s, endpoints = normalizeYs(y_s)
 
 
 
-    return input_lang, output_lang, pairs, y_s, quantiles
+    return input_lang, output_lang, pairs, y_s, endpoints
 
 def readLang(lang):
     print("Reading lines...")
@@ -194,17 +199,17 @@ def tensorsFromPair(pair, input_lang, output_lang):
     return (input_tensor, target_tensor)
 
 def get_dataloader(file_name, batch_size):
-    input_tensor, output_tensor, input_lang, output_lang, y_s, quantiles, pairs = get_data_tensors(file_name)
+    input_tensor, output_tensor, input_lang, output_lang, y_s, endpoints, pairs = get_data_tensors(file_name)
     train_data = TensorDataset(input_tensor, output_tensor, y_s)
 
     train_sampler = RandomSampler(train_data)
     train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=batch_size)
-    return input_lang, output_lang, train_dataloader, quantiles, pairs, y_s
+    return input_lang, output_lang, train_dataloader, endpoints, pairs, y_s
 
 
 # fix this. Allow an input_lang to be specified.
 def get_data_tensors(file_name, prev_lang = None):
-    input_lang, output_lang, pairs, y_s, quantiles = prepare_single_data(file_name, True, prev_lang)
+    input_lang, output_lang, pairs, y_s, endpoints = prepare_single_data(file_name, True, prev_lang)
     n = len(pairs)
     input_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
     target_ids = np.zeros((n, MAX_LENGTH), dtype=np.int32)
@@ -217,8 +222,7 @@ def get_data_tensors(file_name, prev_lang = None):
         input_ids[idx, :len(inp_ids)] = inp_ids
         target_ids[idx, :len(tgt_ids)] = tgt_ids
     
-    
-    return torch.LongTensor(input_ids).to(DEVICE), torch.LongTensor(target_ids).to(DEVICE), input_lang, output_lang, torch.LongTensor(y_s), quantiles, pairs
+    return torch.LongTensor(input_ids).to(DEVICE), torch.LongTensor(target_ids).to(DEVICE), input_lang, output_lang, torch.FloatTensor(y_s), endpoints, pairs
 
 def prepareData(lang1, lang2, reverse=False):
     input_lang, output_lang, pairs = readLangs(lang1, lang2, reverse)
@@ -236,7 +240,7 @@ def prepareData(lang1, lang2, reverse=False):
 
 
 def prepare_single_data(lang1, reverse=False, prevLang = None):
-    input_lang, output_lang, pairs, y_s, quantiles = read_single_lang(lang1, reverse, prevLang)
+    input_lang, output_lang, pairs, y_s, endpoints = read_single_lang(lang1, reverse, prevLang)
 
     if(prevLang is None):
         print("Trimmed to %s sentence pairs" % len(pairs))
@@ -250,4 +254,4 @@ def prepare_single_data(lang1, reverse=False, prevLang = None):
         output_lang = prevLang
     print(input_lang.name, input_lang.n_chars)
     print(output_lang.name, output_lang.n_chars)
-    return input_lang, output_lang, pairs, y_s, quantiles
+    return input_lang, output_lang, pairs, y_s, endpoints
