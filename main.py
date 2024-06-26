@@ -201,11 +201,11 @@ latent_size = 100
 input_lang, output_lang, train_dataloader, endpoints, pairs, y_s = get_dataloader(file_name, batch_size)
 print(random.choice(pairs))
 encoder = EncoderRNN(input_lang.n_chars, hidden_size).to(device)
-variator = Variator(hidden_size, latent_size)
+variator = Variator(hidden_size, latent_size).to(device)
 # has that output size so we don't have to reduce decaying gradients; every ~15 chars gets a fresh hidden state.
 hidden_variator = Variator(hidden_size, latent_size, output_size=num_sub_seqs * hidden_size)
 decoder = AttnDecoderRNN(hidden_size, output_lang.n_chars).to(device)
-regression = LinearRegression(latent_size, MAX_LENGTH, )
+regression = LinearRegression(latent_size, MAX_LENGTH, ).to(device)
 
 encoder.to(device)
 variator.to(device)
