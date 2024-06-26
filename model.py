@@ -56,6 +56,7 @@ class EncoderRNN(nn.Module):
     def forward(self, input, train=False):
         embedded = self.embedding(input)
         hidden = torch.zeros(1, embedded.shape[0], self.hidden_size)
+        hidden = hidden.to(device)
         if(train):
             embedded = self.dropout(embedded)
         
