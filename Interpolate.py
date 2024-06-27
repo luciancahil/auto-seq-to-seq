@@ -19,9 +19,9 @@ featurizer = dc.feat.MolGraphConvFeaturizer(use_edges=True)
 
 MAX_MOLECULE_SIZE = MAX_LENGTH
 
-def get_latents(model, x, y_s):
+def get_latents(model, x):
     # encoder
-    x = model[0](x, y_s)
+    x = model[0](x)
     # first hal of the variators
     output_latent, _ = model[1].encode(x[0])
     hidden_latent, _ = model[2].encode(x[1])
@@ -63,10 +63,9 @@ def idx_to_smiles(indicies):
     return smiles
 
 
-def get_interpolated_latents(latents, y_s):
+def get_interpolated_latents(latents):
     interpolated_latents = []
     interpolated_hidden_latents = []
-    interpolated_ys = []
     for i in range(len(latents[0]) - 1):
         for j in range(i + 1, len(latents[0])):
             # pairs of output_latents
@@ -76,26 +75,17 @@ def get_interpolated_latents(latents, y_s):
             l_1 = latents[1][i,:,:].unsqueeze(dim = 0)
             l_2 = latents[1][j,:,:].unsqueeze(dim = 0)
             interpolated_hidden_latent = interpolate(l_1, l_2)
-
-            y_1 = y_s[i]
-            y_2 = y_s[j]
+          
 
             # add the first element once no matter what
             interpolated_latents += interpolated_latent
             interpolated_hidden_latents += interpolated_hidden_latent
-            interpolated_ys += [y_1] * (NUM_POINTS - 1)
-
-            # if the y's are diferent, add another copy o both latents, as well as the second y
-            if(y_1.item() != y_2.item()):
-                interpolated_latents += interpolated_latent
-                interpolated_hidden_latents += interpolated_hidden_latent
-                interpolated_ys += [y_2] * (NUM_POINTS - 1)
     
-    return interpolated_latents, interpolated_hidden_latents, interpolated_ys
+    return interpolated_latents, interpolated_hidden_latents
 
-def decode_to_smiles(input_latent, hidden_latent, ys_latent):
-    input_latent = model[1].decode(input_latent, ys_latent)
-    hidden_latent= model[2].decode(hidden_latent, ys_latent)
+def decode_to_smiles(input_latent, hidden_latent):
+    input_latent = model[1].decode(input_latent)
+    hidden_latent= model[2].decode(hidden_latent)
     # go from batchsize x 1 x hiddenshape to 1 x batchsize x hidden_shape
     hidden_latent=hidden_latent.squeeze().unsqueeze(dim = 0)
     decoder_outputs,_,_ = model[3](input_latent, hidden_latent)
@@ -107,15 +97,13 @@ def write_smiles_to_file(inputs, filename):
     valid_smiles = set()
     all_smiles  = []
     masses = []
-    num_valid = 0
     all = len(inputs)
     file = open(filename, mode='w')
     for smiles in inputs:
         smiles, weight = repair_smiles(smiles)
-        if (weight != -1) and (smiles not in seed_smiles):
+        if (weight != -1) and (smiles not in seed_smiles) and not(smiles[-3:] == "SOS" and smiles[0:3] == "SOS"):
             string = smiles + "," + str(weight)
             valid_smiles.add(string)
-            num_valid += 1
         
         all_smiles.append(smiles)
 
@@ -135,13 +123,8 @@ def write_smiles_to_file(inputs, filename):
         file.write(smile)
         file.write('\n')
 
-    file.write("There were {} valid smiles, out of {}".format(num_valid, all))
+    file.write("There were {} valid smiles, out of {}".format(len(valid_smiles), all))
 #MAIN
-# if a positive number, we want that bin. If -1, we will target the largest bin.
-try:
-    target_bin = int(sys.argv[1])
-except(Exception):
-    target_bin = -1
 
 
 # objects:
@@ -152,8 +135,7 @@ except(Exception):
 # 4: The Language object
 # 5: The cutof points that tell wether a given value goes in a certain bin.
 model = torch.load(model_path, map_location=device)
-lang = model[4]
-quantiles = model[5]
+lang = model[5]
 
 seeds = open("data/seeds.txt")
 seeds = seeds.readlines()
@@ -161,38 +143,33 @@ seeds = seeds.readlines()
 # turn seeds into
 input = [tensorFromSentence(lang, line.split(',')[0]).squeeze() for line in seeds]
 input = torch.stack(input)
-y_s = [line.split(',')[1] for line in seeds]
-y_s = torch.tensor(np.digitize(y_s, quantiles).tolist())
 
 seed_smiles = idx_to_smiles(input)
 model = torch.load(model_path, map_location=device)
 print("Starting interpolation")
 
-latents = get_latents(model, input, y_s)
+latents = get_latents(model, input)
 # first one is the output, second is the hidden
-interpolated_latents, interpolated_hidden_latents, interpolated_ys = get_interpolated_latents(latents, y_s)
+interpolated_latents, interpolated_hidden_latents = get_interpolated_latents(latents)
 
         
 
         
 input_latents_inter = torch.cat(interpolated_latents, dim = 0)
 hidden_latents_inter = torch.cat(interpolated_hidden_latents, dim = 0)
-ys_latents_inter = torch.stack(interpolated_ys)
 
 
-if(target_bin == -1):
-    target_bin = model[1].embed_condition.num_embeddings - 1
 
 input_latents_gen = torch.randn_like(input_latents_inter)
 hidden_latents_gen = torch.randn_like(hidden_latents_inter)
-ys_latent_gen = torch.tensor([target_bin] * len(ys_latents_inter))
+
 
 
 # decode interpolated smiles
-decoded_chems_inter = decode_to_smiles(input_latents_inter, hidden_latents_inter, ys_latents_inter)
+decoded_chems_inter = decode_to_smiles(input_latents_inter, hidden_latents_inter)
 write_smiles_to_file(decoded_chems_inter, "Interpolated_Smiles.txt")
 
 
-decoded_chems_gen = decode_to_smiles(input_latents_gen, hidden_latents_gen, ys_latent_gen)
+decoded_chems_gen = decode_to_smiles(input_latents_gen, hidden_latents_gen)
 write_smiles_to_file(decoded_chems_gen, "Generated_Smiles.txt")
-print('done!')
+print('Done! Saved new SMILES to "Interpolated_Smiles.txt" and "Generated_Smiles.txt"')
