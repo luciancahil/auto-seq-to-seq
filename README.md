@@ -45,14 +45,12 @@ If you wish to use different seeds, alter the seeds.txt file, formatted with the
 
 ## Biased generation
 
-The values provided in chem.txt and seeds.txt are used to classify the molecules. The molecuels with the smallest 5% of values go into the first bin, the next 5% go into the last bin, and so on.
+The values provided in chem.txt and seeds.txt are used to organize the molecules. This document will discuss molecular weights, but will work for other continuous values that molecuels can have.
 
-This is to help bias the generation process. By default, the model tries to generate molecules that belong to the largest bin.
+This is to help bias the generation process. By including a Convolutional Neural Network that operates on the latent space, the network is trained to organize the latent space in a way that places molecules with similar moleculear weights "near" each other. Thus, when performing interpolation with seed molecules that all have molecular weights around a given value will make the network more likely to generate molecules with that weight.
 
-If you wish to target a different bin, simply add the bin you wish to target as a command line argument. For instance, if you want the smallest bin, type the following into the command line.
+To perform interpolation, edit "data/seeds.txt" to include seeds that have molecular weights close to your goal. Then, type the following into console from the main folder:
 
 ````
 Python Interpolate.py 0
 ````
-
-Note that by default, 20 bins are generated. If you wish to change the number of bins generated, edit the "num_bins" field in utils.py.
