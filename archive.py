@@ -54,6 +54,7 @@ def tensorsFromPair(pair, input_lang, output_lang):
 
 def indexesFromSentence(lang, sentence):
     return [lang.char2index[char] for char in sentence]
+
 def readLangs(lang1, lang2, reverse=False):
     print("Reading lines...")
 

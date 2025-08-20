@@ -54,9 +54,12 @@ def normalizeString(s):
     return s.strip()
 
 
+# turns a sentence into a sequence of ints, where each int represents a char based on the language.
 def indexesFromSentence(lang, sentence):
     return [lang.char2index[char] for char in sentence]
 
+
+# make all y_s such that 90% of them will be between 0 and 1 (to prevent outliers from screwing things up).
 def normalizeYs(y_s):
 
     if(NUM_BINS == -1):
@@ -69,7 +72,7 @@ def normalizeYs(y_s):
     num_bins = 100
     quantiles = np.quantile(y_s, np.linspace(0, 1, num_bins + 1))
     start = quantiles[1]
-    end = quantiles [-1]
+    end = quantiles [-2]
     endpoints = (start, end)
     y_s = [(y - start)/(end - start) for y in y_s]
     # drop first and last elements, which will be the smallest and largest values
@@ -88,17 +91,24 @@ def normalizeYs(y_s):
 """
 def read_single_lang(lang, reverse=False, prevLang = None):
     """
-    A concise, one-line summary of what the function does.
+    Reads sentences from a single language.
 
     Parameters
     ----------
-    param1 : type
-        Description of param1.
+    lang : string
+        The name of the language we are reading
     Returns
     -------
-    type
-        Description of the return value.
-
+    input_lang : Lang
+        Language of input
+    output_lang : Lang
+        Language of input
+    pairs: [String, String]
+        An input-output-pair list
+    y_s: [Float]
+        A list of values for each output in the pair.
+    endpoints: [Float]
+        A number of places you can divide the ys to get equally sized bins.
     """
     print("Reading lines...")
 
@@ -141,12 +151,12 @@ def read_single_lang(lang, reverse=False, prevLang = None):
 
 
 
-
+# check if a word is too long
 def filterWord(w):
-    return len(w) < MAX_LENGTH# and w.startswith(eng_prefixes)
+    return len(w) < MAX_LENGTH
 
 
-
+# remove all words that don't fit the criteria
 def filterWords(words):
     return [word for word in words if filterWord(word[0])]
 
@@ -154,7 +164,7 @@ def filterWords(words):
 
 
 
-
+# get the data loader from the file we are provided
 def get_dataloader(file_name, batch_size):
     
     input_tensor, output_tensor, input_lang, output_lang, y_s, endpoints, pairs = get_data_tensors(file_name)
@@ -165,7 +175,7 @@ def get_dataloader(file_name, batch_size):
     return input_lang, output_lang, train_dataloader, endpoints, pairs, y_s
 
 
-# fix this. Allow an input_lang to be specified.
+# process language into tensors
 def get_data_tensors(file_name, prev_lang = None):
     input_lang, output_lang, pairs, y_s, endpoints = prepare_single_data(file_name, True, prev_lang)
     n = len(pairs)
@@ -180,11 +190,15 @@ def get_data_tensors(file_name, prev_lang = None):
         input_ids[idx, :len(inp_ids)] = inp_ids
         target_ids[idx, :len(tgt_ids)] = tgt_ids
     
-    return torch.LongTensor(input_ids).to(DEVICE), torch.LongTensor(target_ids).to(DEVICE), input_lang, output_lang, torch.FloatTensor(y_s), endpoints, pairs
+    input_tensor = torch.LongTensor(input_ids).to(DEVICE)
+    output_tensor = torch.LongTensor(target_ids).to(DEVICE)
+
+    return input_tensor, output_tensor, input_lang, output_lang, torch.FloatTensor(y_s), endpoints, pairs
 
 
 
 
+# Process Languages after reading it.
 def prepare_single_data(lang1, reverse=False, prevLang = None):
     input_lang, output_lang, pairs, y_s, endpoints = read_single_lang(lang1, reverse, prevLang)
 
@@ -201,3 +215,12 @@ def prepare_single_data(lang1, reverse=False, prevLang = None):
     print(input_lang.name, input_lang.n_chars)
     print(output_lang.name, output_lang.n_chars)
     return input_lang, output_lang, pairs, y_s, endpoints
+
+
+# turns a sentence into a list of numbers, based on what char is what letter in the lang
+def tensorFromSentence(lang, sentence):
+    indexes = indexesFromSentence(lang, sentence)
+    indexes.append(EOS_token)
+    padding = [0] * max(0, MAX_LENGTH - len(indexes))
+    indexes += padding
+    return torch.tensor(indexes, dtype=torch.long, device=DEVICE).view(1, -1)
