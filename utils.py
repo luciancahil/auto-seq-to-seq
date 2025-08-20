@@ -1,20 +1,21 @@
 import unicodedata
 import re
-from Lang import Lang
+from Lang import Lang, EOS_token
 import torch
 import numpy as np
 import time
 import math
-from Lang import EOS_token
-import random
 from torch.utils.data import TensorDataset, DataLoader, RandomSampler
-import sys
-# 
+
+# Parameters
+
+# We decode each sequence bit by bit.
 SUB_SEQ_LEN = 15
 HIDDEN_SIZE = 128
 MAX_LENGTH = 46
 MAX_NUM_SAMPLES = 100000
 NUM_BINS = -1
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def asMinutes(s):
     m = math.floor(s / 60)
@@ -53,26 +54,8 @@ def normalizeString(s):
     return s.strip()
 
 
-def readLangs(lang1, lang2, reverse=False):
-    print("Reading lines...")
-
-    # Read the file and split into lines
-    lines = open('data/%s-%s.txt' % (lang1, lang2), encoding='utf-8').\
-        read().strip().split('\n')
-
-    # Split every line into pairs and normalize
-    pairs = [[normalizeString(s) for s in l.split('\t')] for l in lines]
-
-    # Reverse pairs, make Lang instances
-    if reverse:
-        pairs = [list(reversed(p)) for p in pairs]
-        input_lang = Lang(lang2)
-        output_lang = Lang(lang1)
-    else:
-        input_lang = Lang(lang1)
-        output_lang = Lang(lang2)
-
-    return input_lang, output_lang, pairs
+def indexesFromSentence(lang, sentence):
+    return [lang.char2index[char] for char in sentence]
 
 def normalizeYs(y_s):
 
@@ -100,8 +83,23 @@ def normalizeYs(y_s):
 
     
 
+"""
 
+"""
 def read_single_lang(lang, reverse=False, prevLang = None):
+    """
+    A concise, one-line summary of what the function does.
+
+    Parameters
+    ----------
+    param1 : type
+        Description of param1.
+    Returns
+    -------
+    type
+        Description of the return value.
+
+    """
     print("Reading lines...")
 
     # Read the file and split into lines
@@ -139,66 +137,26 @@ def read_single_lang(lang, reverse=False, prevLang = None):
 
     return input_lang, output_lang, pairs, y_s, endpoints
 
-def readLang(lang):
-    print("Reading lines...")
-
-    # Read the file and split into lines
-    lines = open('data/%s-%s.txt' % (lang), encoding='utf-8').\
-        read().strip().split('\n')
-
-    # Split every line into pairs and normalize
-    pairs = [[normalizeString(s) for s in l.split('\t')] for l in lines]
-
-    # Reverse pairs, make Lang instances
-    input_lang = Lang(lang)
-    output_lang = Lang(lang)
 
 
-    return input_lang, output_lang, pairs
 
 
-eng_prefixes = (
-    "i am ", "i m ",
-    "he is", "he s ",
-    "she is", "she s ",
-    "you are", "you re ",
-    "we are", "we re ",
-    "they are", "they re "
-)
-
-def filterPair(p):
-    return len(p[0].split(' ')) < MAX_LENGTH and \
-        len(p[1].split(' ')) < MAX_LENGTH and \
-        p[1].startswith(eng_prefixes)
 
 def filterWord(w):
     return len(w) < MAX_LENGTH# and w.startswith(eng_prefixes)
 
-def filterPairs(pairs):
-    return [pair for pair in pairs if filterPair(pair)]
+
 
 def filterWords(words):
     return [word for word in words if filterWord(word[0])]
 
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def indexesFromSentence(lang, sentence):
-    return [lang.char2index[char] for char in sentence]
 
-def tensorFromSentence(lang, sentence):
-    indexes = indexesFromSentence(lang, sentence)
-    indexes.append(EOS_token)
-    padding = [0] * max(0, MAX_LENGTH - len(indexes))
-    indexes += padding
-    return torch.tensor(indexes, dtype=torch.long, device=DEVICE).view(1, -1)
 
-def tensorsFromPair(pair, input_lang, output_lang):
-    input_tensor = tensorFromSentence(input_lang, pair[0])
-    target_tensor = tensorFromSentence(output_lang, pair[1])
-    return (input_tensor, target_tensor)
 
 def get_dataloader(file_name, batch_size):
+    
     input_tensor, output_tensor, input_lang, output_lang, y_s, endpoints, pairs = get_data_tensors(file_name)
     train_data = TensorDataset(input_tensor, output_tensor, y_s)
 
@@ -224,19 +182,7 @@ def get_data_tensors(file_name, prev_lang = None):
     
     return torch.LongTensor(input_ids).to(DEVICE), torch.LongTensor(target_ids).to(DEVICE), input_lang, output_lang, torch.FloatTensor(y_s), endpoints, pairs
 
-def prepareData(lang1, lang2, reverse=False):
-    input_lang, output_lang, pairs = readLangs(lang1, lang2, reverse)
-    print("Read %s sentence pairs" % len(pairs))
-    pairs = filterPairs(pairs)
-    print("Trimmed to %s sentence pairs" % len(pairs))
-    print("Counting chars...")
-    for pair in pairs:
-        input_lang.addSentence(pair[0])
-        output_lang.addSentence(pair[1])
-    print("Counted chars:")
-    print(input_lang.name, input_lang.n_chars)
-    print(output_lang.name, output_lang.n_chars)
-    return input_lang, output_lang, pairs
+
 
 
 def prepare_single_data(lang1, reverse=False, prevLang = None):

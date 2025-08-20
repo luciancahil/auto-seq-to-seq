@@ -179,7 +179,10 @@ class Variator(nn.Module):
             x = self.decode(mu)
         
         return x, mu, log_var
-    
+
+
+
+# The Conv layer we use on the Latent Space.
 class LinearRegression(nn.Module):
     def __init__(self, width, height, kernel_size = 3, hidden_channels = 16, hidden_size = 10, output_dim = 1):
         super(LinearRegression, self).__init__()

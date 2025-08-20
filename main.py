@@ -187,6 +187,7 @@ def evaluateRandomly(encoder, variator, hidden_variator, decoder, n=10):
 
 ##MAIN
 file_name = 'chem'
+model_name = 'model_{}.pt'.format(file_name)
 print("Device: " + str(device), flush=True)
 
 
@@ -216,7 +217,7 @@ train(train_dataloader, encoder, variator, hidden_variator, decoder, regression,
 
 full_model = (encoder, variator, hidden_variator, decoder, regression, input_lang, endpoints)
 
-torch.save(full_model, 'model.pt')
+torch.save(full_model, model_name)
 encoder.eval()
 decoder.eval()
 evaluateRandomly(encoder, variator, hidden_variator, decoder, n = 100)

@@ -1,0 +1,7 @@
+Combine optimizers and schedulers.
+
+Maybe combine everything into a single network, with options for raw, conv, and conditional.
+
+Make a graph of all functions in utils.py.
+
+Document and clean up all the functions in utils.py.
